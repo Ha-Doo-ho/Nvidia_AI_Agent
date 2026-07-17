@@ -7,6 +7,9 @@ import numpy as np
 import pandas as pd #pandas 도 numpy로 구성되어 있다. 
 import time 
 
+# keras11_3_kaggle_bike1.py 카피하였음
+
+
 #1. 데이터 (datetime 포기함, casual, registered도 안씀)
 # x는 seanson부터 windspeed까지 사용할 것. y는 count 로 정함.
 # 그래서 0번째 컬럼을 인덱스로 할 것이다. 데이터 취급하지 않겠다는 것이다. 그게 바로 index_col=0이다.  인덱스가 세로줄 이다. 
@@ -65,7 +68,7 @@ model.add(Dense(1, activation='relu'))  #이 activation도 default가 있는데,
 # 3 컴파일 및 훈련
 model.compile(loss='mse', optimizer='adam')
 start_time = time.time() #time.time하면 현재 시간이 time.time에 저장된다.
-model.fit(x_train, y_train, epochs=1000, batch_size=8)
+model.fit(x_train, y_train, epochs=10, batch_size=8, validation_split=0.2)
 end_time = time.time()
 
 # 4 평가 및 예측

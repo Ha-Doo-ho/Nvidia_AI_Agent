@@ -6,6 +6,9 @@ from sklearn.metrics import r2_score, root_mean_squared_error, mean_squared_erro
 import numpy as np
 import pandas as pd #pandas 도 numpy로 구성되어 있다. 
 import time 
+from keras.callbacks import EarlyStopping #keras13_validation1.py와 비교해서 이게 추가되었다. 
+                                          #callbacks에 좋은 게 많이 있다고 한다. 
+
 
 #1. 데이터 (datetime 포기함, casual, registered도 안씀)
 # x는 seanson부터 windspeed까지 사용할 것. y는 count 로 정함.
@@ -59,13 +62,16 @@ model.add(Dense(20, activation='relu')) #초기 가중치가 음수인 것들이
 model.add(Dense(15, activation='relu'))
 model.add(Dense(10, activation='relu')) 
 model.add(Dense(5, activation='relu')) 
-model.add(Dense(1, activation='relu'))  #이 activation도 default가 있는데, activation='linear'이다. y=wx+b 인데, 통상적으로 relu가 더 좋다. 
+model.add(Dense(1, activation='relu'))  #이 activation도 default가 있는데, activation='linear'이다. y=wx+b 인데, 통상적으로 relu가 더 좋다. (오히려 안좋아지는 경우도 있다.)
 #그래서 성능 안나오면 relu 를 사용하면 된다. 그래서 이것도 하이퍼 파라미터 튜닝이다. 
 
 # 3 컴파일 및 훈련
 model.compile(loss='mse', optimizer='adam')
+es= EarlyStopping(monitor='val_loss',mode='min', patience=100, restore_best_weights=True,) #나는 가장 좋은 값을 가중치로 갔겠다. 
+
+
 start_time = time.time() #time.time하면 현재 시간이 time.time에 저장된다.
-model.fit(x_train, y_train, epochs=1000, batch_size=8)
+model.fit(x_train, y_train, epochs=10000000, batch_size=8, validation_split=0.2,callbacks=[es]) #EarlyStopping형태 callbacks에 들어갈 게 es 말고 더 있으니까 리스트 (2개 이상은 리스트)
 end_time = time.time()
 
 # 4 평가 및 예측
@@ -83,6 +89,6 @@ y_submit = model.predict(test_csv)
 #print(y_submit)
 submit_csv['count'] = y_submit #이제 답지의 count에 y_submit을 넣는다.
 print(submit_csv)
-submit_csv.to_csv(path + "submission_0717_1132.csv") #write라고 생각할 수도 있는데, to_csv이다. csv 너에게 주겠다는 것이다.
+submit_csv.to_csv(path + "submission_0717_1453.csv") #write라고 생각할 수도 있는데, to_csv이다. csv 너에게 주겠다는 것이다.
 
 print("걸린시간 : ", end_time-start_time,"초") #print("걸린시간 : ", round(end_time-start_time, 2),"초") 이렇게 하면 소수점 둘째 자리까지만 출력한다. 컴활에서도 이방법을 사용한다. 
