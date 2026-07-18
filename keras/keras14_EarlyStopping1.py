@@ -68,7 +68,7 @@ model.add(Dense(1, activation='relu'))  #이 activation도 default가 있는데,
 # 3 컴파일 및 훈련
 model.compile(loss='mse', optimizer='adam')
 es= EarlyStopping(monitor='val_loss',mode='min', patience=100, restore_best_weights=True,) #나는 가장 좋은 값을 가중치로 갔겠다. 
-
+#restore_best_weights: 학습이 종료된 후 가장 성능이 좋았던 epoch의 가중치로 되돌릴지를 결정
 
 start_time = time.time() #time.time하면 현재 시간이 time.time에 저장된다.
 model.fit(x_train, y_train, epochs=10000000, batch_size=8, validation_split=0.2,callbacks=[es]) #EarlyStopping형태 callbacks에 들어갈 게 es 말고 더 있으니까 리스트 (2개 이상은 리스트)
