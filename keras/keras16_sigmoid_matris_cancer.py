@@ -74,7 +74,7 @@ print("y_predict", y_predict)
 
 r2 = r2_score(y_test, y_predict)
 print("r2: ",r2)
-accuracy_score = accuracy_score(y_test, y_predict)
+accuracy = accuracy_score(y_test, y_predict)
 print(accuracy_score)
 
 # 그냥 하면 ValueError: Classification metrics can't handle a mix of binary and continuous targets 가 나온다. y_predict는 0 에서 1 사이고 y_test하면 0또는 1이기 때문이다. 그래서 무조건 반올림 해야 한다. 
