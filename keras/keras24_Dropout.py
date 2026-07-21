@@ -1,16 +1,18 @@
 import tensorflow as tf 
 from keras.models import Sequential
-from keras.layers import Dense
+from keras.layers import Dense, Dropout
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, root_mean_squared_error, mean_squared_error
 import numpy as np
 import pandas as pd #pandas 도 numpy로 구성되어 있다. 
 import time 
 
+# keras11_3_kaggle_bike1.py을 카피하였다. 
+
 #1. 데이터 (datetime 포기함, casual, registered도 안씀)
 # x는 seanson부터 windspeed까지 사용할 것. y는 count 로 정함.
 # 그래서 0번째 컬럼을 인덱스로 할 것이다. 데이터 취급하지 않겠다는 것이다. 그게 바로 index_col=0이다.  인덱스가 세로줄 이다. 
-# keras11_2_diabetes.py 와 비교해서 이제 csv파일, 즉 keggle을 진행해 보자. 
+
 path = "./_data/"
 train_csv = pd.read_csv(path + "train.csv", index_col=0) 
 test_csv = pd.read_csv(path + "test.csv", index_col=0) # "./_data/test.csv"
@@ -36,31 +38,50 @@ print(y)
 print(y.shape) #(10886,) 가 나온다. 인덱스는 데이터로 안친다. 
 
 # 데이터를 섞은 뒤, train과 test로 나눈다. train_test_split를 사용한다. 이건 필수다.
-x_train, x_test, y_train, y_test = train_test_split(x,y, train_size=0.7, shuffle= True, random_state=10)
+x_train, x_test, y_train, y_test = train_test_split(x,y, train_size=0.7, shuffle= True, random_state=11)
 print(x_train.shape, x_test.shape) #(7620, 8) (3266, 8)
 print(y_train.shape, y_test.shape) #(7620,) (3266,)
 
 # 2 모델구성
 model = Sequential()
 model.add(Dense(5, activation='relu', input_shape=(8,)))
-model.add(Dense(10,activation='relu')) #모르면 activation='relu' 활성화 함수 relu 를 사용하면 ㅗ딤
+model.add(Dropout(0.1))
+model.add(Dense(10,activation='relu')) #모르면 activation='relu' 활성화 함수 relu 를 사용하면 됨
+model.add(Dropout(0.2)) #Dense(10) 밑에 있는 Dropout(0.2): 10개 노드 중 무작위로 2개(20%)의 스위치를 끔
 model.add(Dense(15, activation='relu'))
+model.add(Dropout(0.2))
 model.add(Dense(20, activation='relu'))
+model.add(Dropout(0.2)) #Dense(20) 밑에 있는 Dropout(0.2): 앞 층과는 완전히 별개로, 이번 20개 노드 중 무작위로 4개(20%)의 스위치를 따로 끔.
 model.add(Dense(25, activation='relu'))
+model.add(Dropout(0.2))
 model.add(Dense(30, activation='relu'))
+model.add(Dropout(0.2)) #만약 Dropout(0.3)이면 이번 30개 노드 중 무작위로 20%의 스위치를 꺼버린다. 
 model.add(Dense(35, activation='relu'))
+model.add(Dropout(0.2))
 model.add(Dense(40, activation='relu'))
+model.add(Dropout(0.2))
 model.add(Dense(80, activation='relu'))
+model.add(Dropout(0.2))
 model.add(Dense(40, activation='relu'))
+model.add(Dropout(0.2))
 model.add(Dense(35, activation='relu'))
+model.add(Dropout(0.2))
 model.add(Dense(30, activation='relu'))
+model.add(Dropout(0.2))
 model.add(Dense(25, activation='relu')) #이 개수를 바꿔보는 것이 하이퍼 파라미터 튜닝 (층의 개수를 바꿔보는 것이다.)
+model.add(Dropout(0.2))
 model.add(Dense(20, activation='relu')) #초기 가중치가 음수인 것들이 있다. rel
+model.add(Dropout(0.2))
 model.add(Dense(15, activation='relu'))
+model.add(Dropout(0.2))
 model.add(Dense(10, activation='relu')) 
+model.add(Dropout(0.2))
 model.add(Dense(5, activation='relu')) 
-model.add(Dense(1, activation='relu'))  #이 activation도 default가 있는데, activation='linear'이다. y=wx+b 인데, 통상적으로 relu가 더 좋다. 
-#그래서 성능 안나오면 relu 를 사용하면 된다. 그래서 이것도 하이퍼 파라미터 튜닝이다. 
+model.add(Dropout(0.2))
+model.add(Dense(1, activation='relu'))  
+# DropOut은 훈련 때만 적용이 되는 것이다. 실제 예측, 평가에서는 
+# DropOut은 모델 자체를 바꾸는게 아니고 훈련 할 때만 랜덤으로 선정한 노드만 훈련에서 제외시킨다. 그래서 fit한 뒤에는 Dropout에서 제외된 모든 노드들이 다시 전부 채워지고, 다시 원래의 완전한 노드가 된다. 거기에 x_test를 넣는 것이다. 
+# 이게 빅데이터분석 기사에서 나온다. 
 
 # 3 컴파일 및 훈련
 model.compile(loss='mse', optimizer='adam')
@@ -83,7 +104,7 @@ y_submit = model.predict(test_csv)
 #print(y_submit)
 submit_csv['count'] = y_submit #이제 답지의 count에 y_submit을 넣는다.
 print(submit_csv)
-submit_csv.to_csv(path + "submission_0721_1541.csv") #write라고 생각할 수도 있는데, to_csv이다. csv 너에게 주겠다는 것이다.
+submit_csv.to_csv(path + "submission_0721_1031.csv") #write라고 생각할 수도 있는데, to_csv이다. csv 너에게 주겠다는 것이다.
 
 print("걸린시간 : ", end_time-start_time,"초") #print("걸린시간 : ", round(end_time-start_time, 2),"초") 이렇게 하면 소수점 둘째 자리까지만 출력한다. 컴활에서도 이방법을 사용한다. 
 
@@ -91,3 +112,7 @@ print("걸린시간 : ", end_time-start_time,"초") #print("걸린시간 : ", ro
 #GPU로 실행하면, progress_var도 약간 바뀐다. 무엇으로 실행하고 있는지 구분하기 위해서인 것 같다. 그런데, GPU가 더 느리다. 왜?? GPU가 더 빠르다고 알려져 있는데, 왜 그럴까? 161초걸린다. 
 # 단순한 .csv 파일 같이 레이어가 단순한 단순구조는 무조건 CPU가 빠름. CNN, RNN, Transformer 같은 다차원 구조에서는 GPU가 훨씬 빠르다. 
 # 머리좋고 힘쎈 적은 수의 인원 VS ㅈㄴ 많은 초딩.  
+
+
+# rmse= 266.23321533203125 
+# rmse= 184.11085510253906
