@@ -1,3 +1,6 @@
+# 모델의 체크할 지점을 잡는 것. 그게 checkpoint이다. 
+
+#14_1을 카피하였다. 
 import tensorflow as tf 
 from keras.models import Sequential
 from keras.layers import Dense
@@ -6,10 +9,13 @@ from sklearn.metrics import r2_score, root_mean_squared_error, mean_squared_erro
 import numpy as np
 import pandas as pd #pandas 도 numpy로 구성되어 있다. 
 import time 
+from keras.callbacks import EarlyStopping, ModelCheckpoint # 이제 체크포인트가 나왔다. 
+                                                           # callbacks에 좋은 게 많이 있다고 한다. 
+
 
 #1. 데이터 (datetime 포기함, casual, registered도 안씀)
 # x는 seanson부터 windspeed까지 사용할 것. y는 count 로 정함.
-# 그래서 0번째 컬럼을 인덱스로 할 것이다. 데이터 취급하지 않겠다는 것이다. 그게 바로 index_col=0이다.  인덱스가 세로줄 이다. 
+# 그래서 0번째 컬럼을 인덱스로 할 것이다. 데이터 취급하지 않겠다는 것이다. 그게 바로 index_col=0이다. 인덱스가 세로줄 이다. 
 # keras11_2_diabetes.py 와 비교해서 이제 csv파일, 즉 keggle을 진행해 보자. 
 path = "./_data/"
 train_csv = pd.read_csv(path + "train.csv", index_col=0) 
@@ -59,14 +65,21 @@ model.add(Dense(20, activation='relu')) #초기 가중치가 음수인 것들이
 model.add(Dense(15, activation='relu'))
 model.add(Dense(10, activation='relu')) 
 model.add(Dense(5, activation='relu')) 
-model.add(Dense(1, activation='relu'))  #이 activation도 default가 있는데, activation='linear'이다. y=wx+b 인데, 통상적으로 relu가 더 좋다. 
+model.add(Dense(1, activation='relu'))  #이 activation도 default가 있는데, activation='linear'이다. y=wx+b 인데, 통상적으로 relu가 더 좋다. (오히려 안좋아지는 경우도 있다.)
 #그래서 성능 안나오면 relu 를 사용하면 된다. 그래서 이것도 하이퍼 파라미터 튜닝이다. 
 
 # 3 컴파일 및 훈련
 model.compile(loss='mse', optimizer='adam')
+es= EarlyStopping(monitor='val_loss',mode='min', patience=100, restore_best_weights=True,) #나는 가장 좋은 값을 가중치로 갔겠다. 
+#restore_best_weights: 학습이 종료된 후 가장 성능이 좋았던 epoch의 가중치로 되돌릴지를 결정
+#이게 있으면 가장 좋은 val_loss가 있었던 epoch의 가중치를 사용한다. 이게 없으면 무조건 훈련이 끝났을 때의 가중치, 즉 마지막 epoch로 갱신된 가중치를 사용하게 된다.
+mcp = ModelCheckpoint(monitor = 'val_loss', mode='auto', verbose=1, save_best_only=True, filepath='./_save/keras23_mcp1.keras') #여기서 verbose하면, 여기서 저장되요, 저장되요, 저장되요 . . . 라고 알려줌. EarlyStopping은 patient 걸렸다고 알려준다. 
+
+# 최소의 loss가 나오면 그게 최적의 가중치를 가지고 있으니 그 순간을 저장을 할 것이다. (계속 덮어쓰는 것이다. 이건 EarlyStopping의 개념과 같다. 위/아래로 튀는 곳에서 결국 최소의 loss를 찾아낼 것이고, 그 위치를 체크포인트로 저장할 것이다.)
 start_time = time.time() #time.time하면 현재 시간이 time.time에 저장된다.
-model.fit(x_train, y_train, epochs=300, batch_size=32)
+model.fit(x_train, y_train, epochs=10000000, batch_size=8, validation_split=0.2,callbacks=[es, mcp]) #EarlyStopping형태 callbacks에 들어갈 게 es 말고 더 있으니까 리스트 (2개 이상은 리스트)
 end_time = time.time()
+
 
 # 4 평가 및 예측
 loss = model.evaluate(x_test, y_test)
@@ -83,11 +96,6 @@ y_submit = model.predict(test_csv)
 #print(y_submit)
 submit_csv['count'] = y_submit #이제 답지의 count에 y_submit을 넣는다.
 print(submit_csv)
-submit_csv.to_csv(path + "submission_0721_1031.csv") #write라고 생각할 수도 있는데, to_csv이다. csv 너에게 주겠다는 것이다.
+submit_csv.to_csv(path + "submission_0717_1453.csv") #write라고 생각할 수도 있는데, to_csv이다. csv 너에게 주겠다는 것이다.
 
 print("걸린시간 : ", end_time-start_time,"초") #print("걸린시간 : ", round(end_time-start_time, 2),"초") 이렇게 하면 소수점 둘째 자리까지만 출력한다. 컴활에서도 이방법을 사용한다. 
-
-#CPU 걸린 시간(CUDA를 사용하지 않은 순수): 76.99380779266357 초
-#GPU로 실행하면, progress_var도 약간 바뀐다. 무엇으로 실행하고 있는지 구분하기 위해서인 것 같다. 그런데, GPU가 더 느리다. 왜?? GPU가 더 빠르다고 알려져 있는데, 왜 그럴까? 161초걸린다. 
-# 단순한 .csv 파일 같이 레이어가 단순한 단순구조는 무조건 CPU가 빠름. CNN, RNN, Transformer 같은 다차원 구조에서는 GPU가 훨씬 빠르다. 
-# 머리좋고 힘쎈 적은 수의 인원 VS ㅈㄴ 많은 초딩.  
