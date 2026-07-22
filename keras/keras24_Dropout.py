@@ -3,6 +3,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, root_mean_squared_error, mean_squared_error
+from sklearn.preprocessing import StandardScaler
 import numpy as np
 import pandas as pd #pandas 도 numpy로 구성되어 있다. 
 import time 

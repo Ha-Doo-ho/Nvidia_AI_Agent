@@ -61,14 +61,13 @@ model.add(Dense(8, activation='relu'))
 model.add(Dense(4, activation='relu')) #softmax 통과 전까지는 37만 이따위 값도 다나옴. softmax통과해야 
 model.add(Dense(10, activation='softmax'))  # 다중분류는 무조건 class의 개수가 마지막 출력 층 개수가 문제다.
 
-
 #R2기준으로 0.6 이상 만들기
 # 컴파일 및 훈련
 model.compile(loss='categorical_crossentropy',optimizer='adam', metrics=['accuracy'], ) # 분류모델은 loss가 실무에서 무조건, binary_crossentropy다. 2개 이상은 리스트이다. 무조건. 더 들어갈 수 있는 공간도 있기에 [ ] 로 묶은것이다. 평가 지표로 accuracy를 넣으면, val_accuracy도 같이 출력을 해준다. 
 es = EarlyStopping(monitor='val_accuracy', mode= 'max', patience=100, restore_best_weights=True) #EarlyStopping을 미리 설정을 해 준다. 이거는 콜벡 함수라서 사용할 시 등록을 해주어야 한다.
 
 start_time = time.time()
-model.fit(x_train, y_train, epochs=100, batch_size=4, validation_split = 0.3, callbacks=[es])
+model.fit(x_train, y_train, epochs=1000, batch_size=4, validation_split = 0.3, callbacks=[es])
 end_time = time.time()
 
 print("======================================================================================================")
@@ -98,6 +97,5 @@ print(f"소요 시간: {end_time - start_time}")
 
 # 처음에는 ValueError: Arguments `target` and `output` must have the same rank (ndim). Received: target.shape=(2,), output.shape=(2, 3) 이렇게 나온다. 
 # 이번에는 행렬 로 달라고 말을 하는 것이다. 
-
 
 ####### onehot 02 Tensorflow꺼 이용 ############
