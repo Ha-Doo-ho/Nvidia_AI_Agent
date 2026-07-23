@@ -3,6 +3,7 @@ import tensorflow as tf
 from keras.models import Sequential
 from keras.layers import Dense
 from sklearn.datasets import load_diabetes
+from sklearn.ensemble import 
 
 # 데이터
 x, y = load_diabetes(return_X_y=True) #이런 방식으로도 불러올 수 있다. 예전의 .data, .target으로도 상관 없음

@@ -51,5 +51,5 @@ exit()
 #model = LinearSVC() # 서포트벡터머신 실행. 이건 분류임. 성능도 구림. ㅈㄴ 옛날에 만들어진 알고리즘에 가까움.  r2: 0.14027149321266968
 #model = LogisticRegression() #로지스틱 회귀이다. 놀랍게도 이름에 회귀가 들어갔음에도 불구하고 "분류이다." 실무에서는 안씀. 너무 구림. r2: 0.020361990950226245 
 #model = DecisionTreeRegressor() # 머신러닝은 단층 퍼셉트론이라서 매우 빠르다. 성능도 오히려 tensorflow, pytorch 보다 좋은 것이 많다. 머신러닝이지만 kaggle에서 사용되는 모델이 다 DecisionTreeRegressor 기반이다.  r2: 1.0
-#model = RandomForestRegressor() # r2: 0.9199918300378853. 튜닝을 안하면 의사결정트리보다 성능이 안좋다. 만약 train_test_split이다. validation 등 여러개를 걸어주면 의사결정트리보다 훨씬 좋다.
+#model = RandomForestRegressor() # r2: 0.9199918300378853. <튜닝을 안하면 의사결정트리보다 성능이 안좋다.> 만약 train_test_split이다. validation 등 여러개를 걸어주면 의사결정트리보다 훨씬 좋다.
 # 그래서 이 랜덤포레스트를 개량한 것이 xgboast, LGBM, Catboast 이며, 실무와 대회에서 모두 사용한다. 

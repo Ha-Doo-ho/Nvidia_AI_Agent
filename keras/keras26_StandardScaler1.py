@@ -9,12 +9,13 @@
 
 import tensorflow as tf 
 from keras.models import Sequential
-from keras.layers import Dense
+from keras.layers import Dense, Dropout
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, root_mean_squared_error, mean_squared_error
 from sklearn.datasets import load_diabetes #datasets에는 교육용 데이터가 들어있다.
 import numpy as np
 from sklearn.preprocessing  import MinMaxScaler, StandardScaler #전처리를 preprocessing이라고 함.
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 
 # 25번 카피하였음  
 # train에 정규화를 적용해야 함. 정확히는 x_train에 적용해야 함. y건드리면 데이터 조작이다. 그건 정말로 정답이기 때문이다.  
@@ -38,7 +39,7 @@ print("y: ",y)
 print(x.shape, y.shape) #(442, 10) (442,) --> 10개고 데이터 수가 많지 않다. batch_size를 줄일 수 있는 기회이다. 
 
 # train, test로 자른다. 
-x_train, x_test,y_train, y_test = train_test_split(x,y,train_size=0.8, random_state=11, shuffle=True)
+x_train, x_test,y_train, y_test = train_test_split(x,y,train_size=0.7, random_state=10, shuffle=True)
 print(x_train.shape, x_test.shape) #(15480, 8) (5160, 8) 이걸 무조건 해봐야 한다. 실무에서는 반드시 이걸 함으로써 제대로 분리되었는지 확인한다.
 print(y_train.shape, y_test.shape) # (15480,) (5160,) shpe는 무조건 찍어야 한다. 그래야 열의 개수를 알 있고, 그 열의 개수를 통해, input_dim과 최종 output_dim을 결정할 수 있다. 
 #exit()
@@ -59,23 +60,36 @@ print(np.min(x_test), np.max(x_test))   # -0.031250000000000056 1.0 이다. -가
 # 모델 구성
 model = Sequential()
 model.add(Dense(10,input_shape=(10,)))
-model.add(Dense(16))
-model.add(Dense(32))
-model.add(Dense(68))
-model.add(Dense(126))
-model.add(Dense(258))
-model.add(Dense(126))
-model.add(Dense(32))
-model.add(Dense(16)) #이 개수를 바꿔보는 것이 하이퍼 파라미터 튜닝 (층의 개수를 바꿔보는 것이다.)
-model.add(Dense(8))
-model.add(Dense(4))
-model.add(Dense(1)) 
+model.add(Dropout(0.1))
+model.add(Dense(16,activation='relu'))
+model.add(Dropout(0.1))
+model.add(Dense(32,activation='relu'))
+model.add(Dropout(0.1))
+model.add(Dense(68,activation='relu'))
+model.add(Dropout(0.1))
+model.add(Dense(126,activation='relu'))
+model.add(Dropout(0.2))
+model.add(Dense(258,activation='relu'))
+model.add(Dropout(0.3))
+model.add(Dense(126,activation='relu'))
+model.add(Dropout(0.2))
+model.add(Dense(32,activation='relu'))
+model.add(Dropout(0.1))
+model.add(Dense(16,activation='relu')) #이 개수를 바꿔보는 것이 하이퍼 파라미터 튜닝 (층의 개수를 바꿔보는 것이다.)
+model.add(Dropout(0.1))
+model.add(Dense(8,activation='relu'))
+model.add(Dropout(0.1))
+model.add(Dense(4,activation='relu'))
+model.add(Dropout(0.1))
+model.add(Dense(1,activation='relu')) 
 
 
 #R2기준으로 0.6 이상 만들기
 # 컴파일 및 훈련
 model.compile(loss='mse',optimizer='adam')
-model.fit(x_train, y_train, epochs=115, batch_size=4)
+
+es = 
+model.fit(x_train, y_train, epochs=600, batch_size=4)
 
 # 예측 및 평가
 loss = model.evaluate(x_test,y_test)
