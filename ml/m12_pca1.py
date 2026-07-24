@@ -17,7 +17,8 @@ from sklearn.decomposition import PCA
 
 x, y = load_breast_cancer(return_X_y=True)
 
-pca = PCA(n_components=10) #n_components: 해당 개수로 압축한다. 기존에 30개의 컬럼을 가졌지만 10개로 압축한다. 컬럼이 많으면, 이걸 사용하면 된다.
+pca = PCA(n_components=10) #n_components: 해당 개수로 압축한다. 기존에 30개의 컬럼을 가졌지만 10개로 압축한다. 컬럼이 많으면, 이걸 사용하면 된다. 이 수치도 그래서 확 바뀐다. 
+#성능향상을 기대하긴 어렵지만 컬럼이 몇천개 되는 경우에는 사용하는 선택지이다. 
 x = pca.fit_transform(x) #이것도 전처리다. 그래서 전처리 실행 명령어는 전부 fit_transform()으로 되어 있다. 
 print(x.shape)
 exit()
