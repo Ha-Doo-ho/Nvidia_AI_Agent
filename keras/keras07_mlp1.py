@@ -1,8 +1,8 @@
 import tensorflow as tf
 print(tf.__version__)  #사용하기 위해 _2개 붙인 것일 뿐이다
 
-from tensorflow.keras.models import Sequential #tensorflow(폴더)의 keras(폴더)의 models(폴더) 의 Sequential클래스
-from tensorflow.keras.layers import Dense 
+from keras.models import Sequential #tensorflow(폴더)의 keras(폴더)의 models(폴더) 의 Sequential클래스
+from keras.layers import Dense, Flatten 
 
 import numpy as np
 
@@ -23,6 +23,7 @@ model.add(Dense(100))
 model.add(Dense(100)) #이 개수를 바꿔보는 것이 하이퍼 파라미터 튜닝 (층의 개수를 바꿔보는 것이다.)
 model.add(Dense(10)) 
 model.add(Dense(1)) 
+Flatten()
 #훨씬 간결하다. 어차피 두번째 레이어의 아웃풋dim은 3번째 레이어의 인풋 dim이다. 그래서 이렇게 간결하게 쓸 수 있다.
 # 즉 상층 레이어의 아웃풋(디멘션)은 하층 레이어(디멘션)의 인풋이다. 그래서 생략이 가능한 것이다. 이전 보다 더욱 간결해진 이유이다.
 
