@@ -22,8 +22,8 @@ x_test = x_test.reshape(-1, 28, 28, 1)
 
 # 이미지 스케일링 (정규화)
 # 픽셀 값은 0~255 사이입니다. 이를 0~1 사이로 나누어주면 모델이 훨씬 빠르고 정확하게 학습합니다.
-x_train = x_train / 255.0
-x_test = x_test / 255.0
+x_train = x_train.astype("float32") / 255.0
+x_test = x_test.astype("float32") / 255.0
 
 print("x_train shape:", x_train.shape) # (60000, 28, 28, 1) 확인
 print("y_train shape:", y_train.shape) # (60000,) 확인
@@ -40,7 +40,7 @@ cnn_model.add(Input(shape=(28, 28, 1), name="Input_layer"))
 # 1차 특징 추출기
 cnn_model.add(Conv2D(filters=32, kernel_size=3, padding="same", activation='relu', name="conv_1"))
 cnn_model.add(MaxPool2D(pool_size=2, name="pool_1")) # 주석에 쓰신 대로 기본 strides가 pool_size를 따라갑니다! 패딩도 안하는게 맞습니다.
-# filters가 32개면 바이어스도 32개
+# filters가 32개면 바이어스도 32개. 그리고 입력 채널의 개수를 뜻한다. 
 
 # 2차 특징 추출기
 cnn_model.add(Conv2D(filters=64, kernel_size=3, padding="same", activation='relu', name="conv_2"))  
@@ -69,7 +69,7 @@ cnn_model.fit(
     epochs=10, 
     batch_size=128, # CNN은 연산량이 많아 batch_size를 조금 넉넉히(32, 64, 128 등) 주는 것이 좋습니다.
     validation_split=0.2, 
-    callbacks=[es]
+    callbacks=[es],
 )
 
 
