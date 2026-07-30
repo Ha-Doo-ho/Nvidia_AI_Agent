@@ -22,7 +22,7 @@ x_test = x_test.reshape(-1, 28, 28, 1)
 
 # 이미지 스케일링 (정규화)
 # 픽셀 값은 0~255 사이입니다. 이를 0~1 사이로 나누어주면 모델이 훨씬 빠르고 정확하게 학습합니다.
-x_train = x_train.astype("float32") / 255.0
+x_train = x_train.astype("float32") / 255.0 
 x_test = x_test.astype("float32") / 255.0
 
 print("x_train shape:", x_train.shape) # (60000, 28, 28, 1) 확인
@@ -49,6 +49,8 @@ cnn_model.add(MaxPool2D(pool_size=2, name="pool_2"))
 
 # 통역사 (2차원 -> 1차원)
 cnn_model.add(Flatten(name="flatten"))
+
+# 피처들 형태가 다 다를 때
 
 # 뇌세포 (최종 판단)
 cnn_model.add(Dense(64, activation='relu', name="hidden")) 

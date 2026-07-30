@@ -4,6 +4,7 @@ from keras.models import Sequential
 from keras.layers import Conv2D, MaxPool2D, Flatten, Input, Dense, Dropout, BatchNormalization, RandomRotation
 from keras.callbacks import EarlyStopping
 from keras.datasets import fashion_mnist
+from keras.models import Model
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns 
@@ -54,7 +55,7 @@ cnn_model.add(Dense(10, activation="softmax"))
 
 
 # ==========================================
-# 3. 컴파일 및 훈련 / 4. 평가 및 예측 (이전과 동일하게 진행)
+# 3. 컴파일 및 훈련 
 # ==========================================
 cnn_model.compile(loss='sparse_categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 es = EarlyStopping(monitor='val_loss', mode='min', patience=15, restore_best_weights=True)
@@ -72,6 +73,8 @@ loss, accuracy = cnn_model.evaluate(x_test, y_test)
 print(f"\n최종 Test Loss: {loss:.4f}")
 print(f"최종 Test Accuracy: {accuracy:.4f}")
 
+
+#4. 평가 및 예측 (이전과 동일하게 진행)
 #### 혼동행렬로 평가 및 예측###
 y_predict = cnn_model.predict(x_test)
 y_predict_class = np.argmax(y_predict, axis=1)
@@ -92,20 +95,86 @@ plt.title('Fashion-MNIST Confusion Matrix', fontsize=15)
 plt.tight_layout()      # 그래프 여백을 깔끔하게 자동 정리해 줍니다.
 plt.show()
 
+# 5. Grad-CAM 용 모델 적의 (추가된 부분)
+print("\n--- Grad-CAM용 모델 생성 ---")
 
-"""
-실무와 학계의 표준에서는 일반적인 Dropout을 보통 Dense 층(또는 Flatten 직후)에만 집중적으로 사용합니다.
+# 1. 계산 시작점: 원본 모델의 입력
+inputs = cnn_model.inputs
 
-이미지의 공간적 연관성 (가장 핵심적인 이유)
-이미지를 보면 픽셀 하나하나가 독립적이지 않고, 바로 옆에 있는 픽셀들과 색상, 모양이 거의 같다는 특징을 가진다. 
-GPT 다크모드 사용하면 검은 픽셀 주변은 대부분 검은 픽셀인 것이 그 이유이다. 
+# 2. 중간 도착점: 마지막 합성곱 층의 출력 (특징 맵)
+# 위에서 지정한 이름("last_conv")으로 해당 층을 불러옵니다.
+last_conv_layer = cnn_model.get_layer("conv2d_1")
+last_conv_output = last_conv_layer.output
 
-Conv2D를 통과한 데이터에 일반 Dropout을 걸어 특정 픽셀(노드)을 무작위로 꺼버렸다고 가정해 보겠습니다.
-모델의 꼼수: 모델은 주변 픽셀의 값을 이용해서 꺼진 값을 유추할 수 있다. 그래서 DropOut이 그렇게 효과를 보지는 못한다. (좋아질 여지는 있으나 미미하다는 것)
+# 3. 최종 도착점: 원본 모델의 최종 출력 (클래스 예측 점수)
+model_output = cnn_model.output
 
-그래서 Conv층에서 Dropout을 걸고 싶다면, 일반 Dropout 대신 SpatialDropout2D가 더 적합할 수 있다
-일반 Dropout을 사용하면 특징 맵의 개별 위치를 무작위로 제거한다. 
-그래서 주변 픽셀을 보고 유추할 수 있기 때문에, 일반 Dropout이 효과가 미미할 것이라고 하는 것이다. 
-SpatialDropout2D는 feature 맵 한 채널 전체를 제거한다. 
-Keras공식 문서에서는 Conv 층에서는 일반 Dropout보다 SpatialDropout2D를 사용하도록 권유한다.  
-"""
+# 4. 특징 맵과 최종 출력을 동시에 반환하는 새로운 모델 생성
+grad_model = Model(inputs=inputs, outputs=[last_conv_output, model_output])
+
+# 모델 구조 확인
+grad_model.summary()
+
+###############
+# ==========================================
+# 6. Grad-CAM 열화상 이미지 추출 및 시각화
+# ==========================================
+# 1. 테스트 데이터에서 이미지 하나 선택 (예: 0번째 이미지 - 앵클부츠)
+img_index = 0 
+test_image = x_test[img_index:img_index+1] # (1, 28, 28, 1) 형태로 차원 유지
+true_label = y_test[img_index]
+
+# 2. GradientTape를 사용하여 그래디언트(기울기) 계산
+with tf.GradientTape() as tape:
+    inputs = tf.cast(test_image, tf.float32)
+    
+    # grad_model에 이미지를 통과시켜 특징 맵과 예측값을 얻음
+    last_conv_output, preds = grad_model(inputs)
+    
+    # 모델이 가장 높게 예측한 클래스의 인덱스 찾기
+    pred_index = tf.argmax(preds[0])
+    
+    # 타겟 클래스의 예측 점수
+    class_channel = preds[:, pred_index]
+
+# 3. 그래디언트 계산: 예측 점수를 마지막 특징 맵으로 미분
+grads = tape.gradient(class_channel, last_conv_output)
+
+# 4. 특징 맵에 곱해줄 가중치 계산 (그래디언트의 공간적 평균 - Global Average Pooling)
+pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+
+# 5. 특징 맵의 각 채널에 가중치를 곱하여 하나로 합침
+last_conv_output = last_conv_output[0]
+heatmap = last_conv_output @ pooled_grads[..., tf.newaxis]
+heatmap = tf.squeeze(heatmap)
+
+# 6. ReLU 적용 및 0~1 사이로 정규화 (긍정적인 영향만 남김)
+heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+heatmap = heatmap.numpy()
+
+# 7. 시각화 (열화상 카메라 효과)
+plt.figure(figsize=(12, 4))
+
+# ① 원본 이미지
+plt.subplot(1, 3, 1)
+plt.imshow(test_image[0, :, :, 0], cmap='gray')
+plt.title(f"Original Image\n(True: {class_names[true_label]})", fontsize=14)
+plt.axis('off')
+
+# ② Grad-CAM 히트맵 (열화상)
+plt.subplot(1, 3, 2)
+# 💡 cmap='jet' 속성이 바로 '열화상 카메라' 스타일의 색상을 만들어줍니다!
+plt.imshow(heatmap, cmap='jet') 
+plt.title("Grad-CAM Heatmap", fontsize=14)
+plt.axis('off')
+
+# ③ 겹쳐진 이미지 (오버레이)
+plt.subplot(1, 3, 3)
+plt.imshow(test_image[0, :, :, 0], cmap='gray')
+# interpolation='bilinear'로 히트맵을 부드럽게 확대해서 원본 이미지 위에 덮어씌웁니다.
+plt.imshow(heatmap, cmap='jet', alpha=0.5, interpolation='bilinear') 
+plt.title("Superimposed Image", fontsize=14)
+plt.axis('off')
+
+plt.tight_layout()
+plt.show()
