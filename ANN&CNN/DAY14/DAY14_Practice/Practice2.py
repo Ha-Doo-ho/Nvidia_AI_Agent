@@ -6,6 +6,7 @@ from keras import regularizers
 from keras.layers import Input, RandomRotation, Conv2D,MaxPool2D, BatchNormalization, Flatten, GlobalAveragePooling2D, Dense
 from keras.datasets import fashion_mnist
 from keras.callbacks import EarlyStopping, ModelCheckpoint
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt 
 
 
@@ -51,6 +52,12 @@ end_time = time.time()
 # 4. Model Evalutate and Predict
 loss, accuracy = cnn_model.evaluate(x_test, y_test) 
 y_predict = cnn_model.predict(x_test)
-y_predict_class = np.argmax(y_predict)
+y_predict_class = np.argmax(y_predict, axis=1)
+
+cm = confusion_matrix(y_test, y_predict_class)
+disp_labels = ['T-shirt/top','Trouser','Pullover','Dress','Coat','Sandal','Shirt','Sneaker','Bag','Ankle boot']
+display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=disp_labels)
+display.plot(cmap="BuPu_r",xticks_rotation=45)
+plt.show()
 
 

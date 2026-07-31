@@ -8,9 +8,9 @@ from keras.models import Model
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns 
-
 # 🌟 L2 규제를 사용하기 위해 regularizers를 임포트합니다.
 from keras import regularizers 
+
 RandomRotation(0.08, seed=42, )
 # ==========================================
 # 1. 데이터 (생략 - 이전과 동일)
@@ -27,7 +27,7 @@ cnn_model = Sequential(name="cnn_with_l2")
 cnn_model.add(Input(shape=(28, 28, 1), name="Input_layer"))
 
 # --- 1차 특징 추출기 ---
-cnn_model.add(Conv2D(32, kernel_size=3, padding="same", activation='relu'))
+cnn_model.add(Conv2D(32, kernel_size=3, padding="same", activation='relu',))
 cnn_model.add(BatchNormalization())
 cnn_model.add(MaxPool2D(pool_size=2)) 
 
