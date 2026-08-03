@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from keras.datasets import cifar10
 from keras.models import Sequential
-from keras.layers import Input, RandomRotation, Conv2D, BatchNormalization, MaxPool2D, GlobalAveragePooling2D, Dense
+from keras.layers import Input, RandomRotation,RandomFlip, Conv2D, BatchNormalization, MaxPool2D, GlobalAveragePooling2D, Dense
 from keras.regularizers  import l2
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
@@ -20,7 +20,8 @@ x_test = x_test.reshape(-1, 32, 32, 3).astype("float32") / 255.0
 # 2. 모델 구성 
 cnn_model = Sequential()
 cnn_model.add(Input(shape=(32, 32, 3)))
-cnn_model.add(RandomRotation(factor=0.08, fill_mode="nearest", interpolation="bilinear", seed=30))
+#cnn_model.add(RandomRotation(factor=0.08, fill_mode="nearest", interpolation="bilinear", seed=30))
+cnn_model.add(RandomFlip(mode="horizontal",seed=34))
 
 cnn_model.add(Conv2D(filters=32, kernel_size=3, padding="same", activation='relu'))
 cnn_model.add(BatchNormalization())
