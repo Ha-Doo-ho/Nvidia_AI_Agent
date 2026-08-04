@@ -89,19 +89,9 @@ model.summary()
 # 6. 콜백
 # =========================================================
 
-early_stopping = EarlyStopping(
-    monitor="val_loss",
-    mode="min",
-    patience=5,
-    restore_best_weights=True
-)
+early_stopping = EarlyStopping(monitor="val_loss",mode="min",patience=5,restore_best_weights=True)
 
-model_checkpoint = ModelCheckpoint(
-    filepath="./text_lstm_best.keras",
-    monitor="val_loss",
-    mode="min",
-    save_best_only=True
-)
+model_checkpoint = ModelCheckpoint(filepath="./text_lstm_best.keras", monitor="val_loss", mode="min", save_best_only=True)
 
 
 # =========================================================
@@ -109,15 +99,7 @@ model_checkpoint = ModelCheckpoint(
 # =========================================================
 
 start_time = time.time()
-history = model.fit(
-    x_train,
-    y_train,
-    epochs=30,
-    batch_size=2,
-    validation_split=0.2,
-    callbacks=[early_stopping, model_checkpoint],
-    verbose=1
-)
+history = model.fit(x_train,y_train,epochs=30,batch_size=2,validation_split=0.2,callbacks=[early_stopping, model_checkpoint],verbose=1)
 end_time = time.time()
 
 print(f"학습 시간: {end_time - start_time:.2f}초")
