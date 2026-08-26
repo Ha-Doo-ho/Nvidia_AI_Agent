@@ -1,0 +1,13 @@
+회귀와 분류가 있다.
+분류는 이진, 다중분류로 나눈다. 이진은 2개 분류, 2개 이상이면 다중 분류이다. (보통 3개 이상부터 다중 분류를 사용한다.) 그래서 이진 분류는 다중분류 이기도 하다. 
+이진분류에서 반드시 기억해야 할 2가지는 [loss는 binary_crossentropy, '마지막 layer'의 활성화 함수는 sigmoid]
+다중분류에서 반드시 기억해야 할 2가지는 [loss는 categrical_crossentropy, '마지막 layer'의 활성화 함수는 softmax]
+
+훈련에 과적합된 훈련을 보고 있었다. 그래서 훈련과정을 보면 그 훈련은 train에 과적화된 훈련이다. 그 과적합을 줄이고 훈련을 제대로 하는지, 훈련을 개떡같이 하는지(과적합이 되는지) 알 수 있다.
+그걸 확인하는 것이 분류에서 metrics=['accuracy'] 를 걸어주는 것이다. 
+monitor을 accuracy 로하면 mode 는 max다 monitor을 val_loss하면 mode는 min 헷갈리면 auto로 주면 자동으로 잡아준다. 이게 default인 것으로 알고 있다. 
+restore_best_weights가 있으면 가장 잘 나올 때로 멈춰준다. false면 무조건 최종 마지막 끝날 때의 가중치로 바꿔준다. 신기한 것은 false가 default인데, 실무에서는 정말 가끔 restore_best_weights가 false일 때 더 잘나오는 경우가 있다.
+이론과 실무가 달라지는 신기한 부분이다. 놀랍게도 이러한 부분이 있기에, restore_best_weights가 false 가 default이다. 
+
+loss와 지표를 구분하면 좋다. loss는 최종이고, r2, rmse, accuray 같은 것은 지표로 훈련에 사용하지 않는다. 즉, 훈련이 제대로 되는지 확인하기 위한 지표일 뿐이다.
+loss는 0이 제일 좋다. () accuracy같은 지표는 높아야 좋다.  

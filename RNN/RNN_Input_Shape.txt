@@ -1,0 +1,12 @@
+신경망별 입력 형태(Input Shape) 비교
+DNN (완전 연결 신경망): 데이터 개수 무시, 열(특성) 우선
+input_shape = (Features,)
+예시: 4개 과목의 성적 데이터 --> (4,)
+
+CNN (합성곱 신경망): 데이터 개수 무시, 행, 열, 채널 우선
+input_shape = (Height, Width, Channels)
+예시: 가로 28, 세로 28 픽셀의 흑백 이미지 --> (28, 28, 1)
+
+RNN (순환 신경망): 데이터 개수 무시, 순서(시간축), 특성 우선
+input_shape = (Timesteps, Features)
+예시: 과거 24시간 동안 기록된 온도와 습도 --> (24, 2)
