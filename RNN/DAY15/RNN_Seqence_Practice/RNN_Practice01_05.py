@@ -15,7 +15,7 @@ from keras.metrics import AUC
 
 VOCAB_SIZE = 10000      # 사전에 들어갈 단어의 개수 
 MAX_LENGTH = 200        # 한 문장의 길이  
-EMBEDDINT_DIM = 128     # 문장은 단어로 이루어져 있는데, 그 단어를 벡터로 만든다. 그 벡터를 몇차원으로 할 것인가? 크면 더 다양한 단어를 담을 수 있을 것 
+EMBEDDINT_DIM = 128     # 문장은 단어로 이루어져 있는데, 그 단어를 벡터로 만든다. 그 벡터를 몇차원으로 할 것인가? 단어 하나를 몇 개의 학습 가능한 특징으로 표현할지 결정한다.
 
 
 PATH = "./_save/keras_RNN_imdb_SimpleRNN.keras"
@@ -29,7 +29,7 @@ print(y_train) #[1 0 0 ... 0 1 0] 2만 5000개 있음. 답지이다. 0은 Negati
 
 # 1-1 데이터 전처리 (RNN 문장 분석은 Padding, Truncating, Masking을 생각해야 함)
 x_train = pad_sequences(sequences=x_train, maxlen=MAX_LENGTH, padding="pre", truncating="post",)
-x_test = pad_sequences(sequences=x_test, maxlen=MAX_LENGTH, padding="pre", truncating="pre", )
+x_test = pad_sequences(sequences=x_test, maxlen=MAX_LENGTH, padding="pre", truncating="post", )
 
 x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, train_size=0.7, random_state=11, stratify=y_train)
 
@@ -49,11 +49,35 @@ model.add(SimpleRNN(64, activation="tanh", return_sequences=False)) #은닉층
 # 각 은닉층 박스(hₜ)에는 다음과 같이 은닉 상태 값 64개가 들어 있다. 이게 SimpleRNN(64, activation="", . . .) 의 64이다. 
 # h1(this) = [h₁,₁  h₁,₂  h₁,₃  h₁,₄  h₁,₅  . . . .h₁,₆₄] 
 # h2(movie) = [h₂,₁  h₂,₂  h₂,₃  h₂,₄  h₂,₅ . . . . h₂,₆₄]
+# 입력값이자 현재 단어 임베딩인 xₜ: 128차원 이므로 xₜ(128, ) 이다. 이전 은닉상태인 hₜ₋₁: 64차원이므로 (64, )
 # 각 시점에서 이전 은닉 상태와 현재 단어 임베딩을 함께 계산한다.
-# 즉, 현재 단어 임베딩 xₜ는 128차원인데, 이전 은닉 상태 hₜ₋₁은 64차원이다. 서로 차원이 다르다.
-# 이 두 정보를 이용해 새로운 64차원 은닉 상태를 만든다. 여기서 activation="tanh"가 사용이 되는 것이다. 
-# 즉 현재 은닉층이 가지게 되는 값은 ht = tanh(xt*Wxh + ht-1*Whh + bh) 가 되는 것이다. 
+# 즉, 현재 단어 임베딩 xₜ는 벡터 128차원인데, 이전 은닉 상태 hₜ₋₁은 64차원이다. 서로 차원이 다르다.
+# xₜ * Wₓₕ​ 는 shape 상으로 (1, 128) x (128, 64) = (1, 64) this의 128차원 임베딩 -> Wₓₕ와 행렬곱 -> 64개의 새로운 조합값이 된다. 
+# 해석하면, 이 두 정보를 이용해 새로운 64차원 은닉 상태를 만든다. 여기서 출력할 때 activation="tanh"가 사용이 되는 것이다. 
+# 즉, 현재 은닉층이 가지게 되는 값은 ht = tanh(xₜ*Wₓₕ + ht-1*Wₕₕ + bₕ) 가 되는 것이다. (가중치는 모두가 공통으로 가져간다.)
 # activation="tanh"는 만들어진 64개 값 각각에 적용된다.
+# return_sequnece 설정은 ★마지막★ 은닉 상태에 모든 정보를 담을지 말지를 결정하는 기능이다. False면 마지막 은닉 상태만 출력하는데, (이 최종 벡터에 전체 문장의 맥락이 압축되어 있다고 보기 때문)
+# 이는 사전에 있는 단어 정보를 마지막 hₜ에 모두 담아야 하는 부담을 주게 된다. True로 바꾸면 단어마다, 긍정 / 부정을 판단하는 문제가 되어 버린다. 
+
+"""
+언제 return_sequences=True를 사용하는가?
+
+RNN을 여러 층 쌓을 때 앞쪽 RNN에 사용한다.
+model.add(
+    SimpleRNN(
+        64,
+        return_sequences=True
+    )
+)
+
+model.add(
+    SimpleRNN(
+        32,
+        return_sequences=False
+    )
+)
+"""
+
 
 """
 tanh 적용 전:
@@ -68,6 +92,7 @@ tanh 적용 후:
 # shape: (batch, 200, 128) → (batch, 64)
 # RNN을 사용하여, 기존 GlobalAveragePooling1D 를 사용하였을 때 보다 위치정보를 잘 처리할 수 있게 되었다.
 # 그러나 문장이 길어지면 오래전 정보를 잘 유지하지 못할 수 있다는 한계가 여전히 남아있다. 
+# 또한 RNN은 가중치가 너무 작으면 기울기 소실 문제가 발생하며, 가중치가 너무 크면 기울기가 폭발할 수 있다. 
 """
 현재 단어 임베딩
 xₜ: 128개
@@ -95,7 +120,7 @@ es = EarlyStopping(monitor="val_accuracy", patience=5, mode="max", restore_best_
 mcp = ModelCheckpoint(filepath=PATH, monitor="val_accuracy", save_best_only=True, mode="max",)
 
 start_time = time.time()
-model.fit(x_train, y_train, batch_size=64, epochs=10, validation_data=(x_val, y_val), shuffle=True)
+model.fit(x_train, y_train, batch_size=64, epochs=10, validation_data=(x_val, y_val), shuffle=True, callbacks=[es, mcp])
 end_time = time.time()
 
 real_time = np.round(end_time-start_time, 4)
@@ -118,8 +143,8 @@ print(f"loss:{loss}, accuracy:{accuracy}, auc:{auc}")
  2차원 형태이다. 1차원으로 바꾸던가 차원 변경을 해야 한다. 그래서 기본 쌩짜로 찍어보라는 것이다. 
 """
 
-y_predict = model.predict(x_test).flatten()
-y_predict_probablity = (y_predict > 0.5).astype("int32")
-print(f"{y_predict_probablity}")
+y_predict = model.predict(x_test).flatten() #1차원 변경
+y_predict_probability = (y_predict > 0.5).astype("int32")
+print(f"{y_predict_probability}")
 print(f"accuracy: {np.round(accuracy, 4)}, 소요시간: {real_time}")
 

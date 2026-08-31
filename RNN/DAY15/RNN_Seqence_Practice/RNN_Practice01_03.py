@@ -53,6 +53,7 @@ model.add(Embedding(input_dim=VOCAB_SIZE, output_dim=EMBEDDING_DIM, mask_zero=Tr
 
 model.add(GlobalAveragePooling1D()) #리뷰 안의 유효한 모든 단어 임베딩 벡터를 평균 내어, 길이 128인 하나의 문장 대표 벡터로 만드는 계층
                                     #빠르고 가벼운 기준 모델을 만드는 데 유용하지만, "단어 순서를 잃기 때문"(해당 단어가 어디에 있는지 그 위치 정보를 잃는다.)에 SimpleRNN, LSTM, GRU와 비교해 보는 것이 좋다. 
+
 """
 
 단계        코드                        출력 shape
