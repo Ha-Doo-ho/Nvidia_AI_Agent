@@ -48,10 +48,21 @@ x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, train_size=0
 
 # 2.모델 구성
 model = Sequential()
-model.add(Input(shape=(MAX_LENGTH, ))) # 입력가 단어 ID(지금은 그 ID가 들어갈 수 있는 인덱스 개수200개)가 1렬로 놓인 벡터 형태이다. 
+model.add(Input(shape=(MAX_LENGTH, ))) # 입력 단어 ID(지금은 그 ID가 들어갈 수 있는 인덱스 개수200개)가 1렬로 놓인 벡터 형태이다. 
 model.add(Embedding(input_dim=VOCAB_SIZE, output_dim=EMBEDDING_DIM, mask_zero=True, )) #안 읽는 부분은 0으로 마스킹해서 읽으면 안된다. 
 
-model.add(GlobalAveragePooling1D())
+model.add(GlobalAveragePooling1D()) #리뷰 안의 유효한 모든 단어 임베딩 벡터를 평균 내어, 길이 128인 하나의 문장 대표 벡터로 만드는 계층
+                                    #빠르고 가벼운 기준 모델을 만드는 데 유용하지만, 단어 순서를 잃기 때문에 SimpleRNN, LSTM, GRU와 비교해 보는 것이 좋다. 
+"""
+
+단계        코드                        출력 shape
+------------------------------------------------------------
+입력	    Input(shape=(200,))	        (64, 200)
+임베딩	    Embedding(10000, 128)	    (64, 200, 128)
+평균 풀링	GlobalAveragePooling1D()	(64, 128)
+
+"""
+
 print(x_train.shape, x_val.shape)
 
 model.add(Dense(64, activation="relu"))
