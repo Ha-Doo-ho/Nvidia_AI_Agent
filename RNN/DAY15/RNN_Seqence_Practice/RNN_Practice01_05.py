@@ -44,10 +44,42 @@ model.add(Input(shape=(200, )))
 model.add(Embedding(input_dim=VOCAB_SIZE, output_dim=EMBEDDINT_DIM, mask_zero=True)) # 단어를 넣으면 임베딩해야 한다. input_dim은 사전에 등재된 단어의 개수, output_dim은 하나의 단어를 표현할 때 몇 차원의 Vector로 표현하는지를 의미한다. 
 
 model.add(SimpleRNN(64, activation="tanh", return_sequences=False)) #은닉층
-# 200개의 단어 임베딩을 순서대로 처리한다.
+# 최대 200개의 단어 임베딩을 순서대로 처리한다.
+# 만약 this   movie   is     not    good 이렇게 5개의 단어가 있다고 하면, 은닉층 박스(hₜ)가 5개가 있다는 의미이며, 이 은닉층을 숫자로 표현하는데, 64개의 숫자로 표현한다는 것. 
+# 각 은닉층 박스(hₜ)에는 다음과 같이 은닉 상태 값 64개가 들어 있다. 이게 SimpleRNN(64, activation="", . . .) 의 64이다. 
+# h1(this) = [h₁,₁  h₁,₂  h₁,₃  h₁,₄  h₁,₅  . . . .h₁,₆₄] 
+# h2(movie) = [h₂,₁  h₂,₂  h₂,₃  h₂,₄  h₂,₅ . . . . h₂,₆₄]
 # 각 시점에서 이전 은닉 상태와 현재 단어 임베딩을 함께 계산한다.
+# 즉, 현재 단어 임베딩 xₜ는 128차원인데, 이전 은닉 상태 hₜ₋₁은 64차원이다. 서로 차원이 다르다.
+# 이 두 정보를 이용해 새로운 64차원 은닉 상태를 만든다. 여기서 activation="tanh"가 사용이 되는 것이다. 
+# 즉 현재 은닉층이 가지게 되는 값은 ht = tanh(xt*Wxh + ht-1*Whh + bh) 가 되는 것이다. 
+# activation="tanh"는 만들어진 64개 값 각각에 적용된다.
+
+"""
+tanh 적용 전:
+[1.3, -0.7, 0.2, ..., 2.1]
+
+tanh 적용 후:
+[0.86, -0.60, 0.20, ..., 0.97]
+"""
+
+
 # 마지막 유효 단어까지 처리한 은닉 상태만 출력한다.
 # shape: (batch, 200, 128) → (batch, 64)
+# RNN을 사용하여, 기존 GlobalAveragePooling1D 를 사용하였을 때 보다 위치정보를 잘 처리할 수 있게 되었다.
+# 그러나 문장이 길어지면 오래전 정보를 잘 유지하지 못할 수 있다는 한계가 여전히 남아있다. 
+"""
+현재 단어 임베딩
+xₜ: 128개
+       ↓
+입력 가중치와 계산
+       +
+이전 은닉 상태
+hₜ₋₁: 64개
+       ↓
+새로운 은닉 상태
+hₜ: 64개
+"""
 
 
 model.add(Dense(64, activation="relu")) # 은닉층 중에서 분류층
@@ -63,7 +95,7 @@ es = EarlyStopping(monitor="val_accuracy", patience=5, mode="max", restore_best_
 mcp = ModelCheckpoint(filepath=PATH, monitor="val_accuracy", save_best_only=True, mode="max",)
 
 start_time = time.time()
-model.fit(x_train, y_train, batch_size=32, epochs=10, validation_data=(x_val, y_val), shuffle=True)
+model.fit(x_train, y_train, batch_size=64, epochs=10, validation_data=(x_val, y_val), shuffle=True)
 end_time = time.time()
 
 real_time = np.round(end_time-start_time, 4)
@@ -89,5 +121,5 @@ print(f"loss:{loss}, accuracy:{accuracy}, auc:{auc}")
 y_predict = model.predict(x_test).flatten()
 y_predict_probablity = (y_predict > 0.5).astype("int32")
 print(f"{y_predict_probablity}")
-print(f"소요시간: {real_time}")
+print(f"accuracy: {np.round(accuracy, 4)}, 소요시간: {real_time}")
 
