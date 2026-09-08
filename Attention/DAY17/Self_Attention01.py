@@ -55,7 +55,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from keras.datasets import imdb
 from keras.utils import pad_sequences
 from keras.models import Sequential, Model
-from keras.layers import Input, Embedding, MultiHeadAttention, GlobalAveragePooling1D, Dense, Dropout
+from keras.layers import Input, Embedding, MultiHeadAttention, GlobalAveragePooling1D, Dense, Dropout, Token
 from keras.metrics import AUC
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 
@@ -68,8 +68,8 @@ Path = "./_save/keras_Attention_imdb1.keras"
 
 (x_train, y_train), (x_test, y_test) = imdb.load_data(num_words=VOCAB)
 
-# 1-2. Data Preprocessing
-x_train = pad_sequences(sequences=x_train, maxlen=MAXLEN, padding="pre", truncating="pre")
+# 1-2. Data Preprocessing 
+x_train = pad_sequences(sequences=x_train, maxlen=MAXLEN, padding="pre", truncating="pre") #<-- 오직 0으로 채워주거나 padding과 truncating을 명시할 뿐이다. 
 x_test = pad_sequences(sequences=x_test, maxlen=MAXLEN, padding="pre", truncating="pre")
 
 x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, train_size=0.85, random_state=11, shuffle=True, stratify=y_train)
@@ -95,7 +95,7 @@ embedding = Embedding(input_dim=VOCAB, output_dim=EMBEDDING_DIM, mask_zero=True)
 # 가중치 행렬은 헤드마다 할당되므로 1번헤드 Wᵠ, Wᴷ, Wⱽ, 2번헤드 Wᵠ, Wᴷ, Wⱽ 이렇게 이루어 진다. 
 # 이들을 Embedding된 단어에 곱해서 같은 단어지만 서로 다른 관점으로 재표현하는 것이다. 
 # key_dim 은 기존 n 차원이던, 단어 임베딩을 더 작은 차원의 Query와 Key로 변환시켜 주는 것이다. 그 이유는 보통 임베딩한 차원의 절반으로 Query와 Value를 만드는 경향이 있기 때문이다. (꼭 작아지지 않아도 되는데, 보통 개발자들이 반으로 쪼갬.)
-# 각 담당 질문의 개수라고 생각하면 된다. num_head 각각이 가지고 있는 질문이 64개라는 의미
+# key_dim 은 각 담당 질문의 개수라고 생각하면 된다. num_head 각각이 가지고 있는 질문이 64개라는 의미
 attention_output = MultiHeadAttention(num_heads=2, key_dim=64)(query=embedding, value=embedding, key=embedding)
 
 embedding = GlobalAveragePooling1D()(attention_output)
