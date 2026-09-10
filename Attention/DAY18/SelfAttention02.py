@@ -41,12 +41,19 @@ from keras_hub.layers import PositionEmbedding
 from keras.models import Model
 
 from keras.datasets import imdb
+from keras.metrics import AUC  
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, TimeSeriesSplit
+
+import time
+import matplotlib.pyplot as plt
 
 # 1-1데이터
 VOCAB= 10000
 MAX_LEN = 200
 EMBEDDING_DIM = 128
+PATH = "./_save/keras_Attention_imdb2.keras"
 
 (x_train, y_train), (x_test, y_test) = imdb.load_data(num_words=VOCAB)
 #print(x_train.shape, y_train.shape) #(25000,) (25000,)
@@ -135,4 +142,51 @@ False False True  True  True
 """
 
 # 실제 Attention 계산에 적용
-attention_output = MultiHeadAttention(num_heads=3, key_dim=64)(query=embedding, key=embedding, value=embedding, attention_mask=attention_mask)
+attention_output = MultiHeadAttention(num_heads=3, key_dim=64)(query=embedding, key=embedding, value=embedding, attention_mask=attention_mask) #여기서 내적이 일어나서 값이 큰 것은 해당 Query에 대해 Key가 잘 설명을 하고 있다고 판단하고 문맥 판단을 하는 것이다. 
+#####################################################################################################################################################   <--- AttentionLayer 역할이다.  문맥은 여기서 파악된다. 
+# 실제로는 Attention Layer -> Normalization Laher -> MLP 가 순서대로 반복되는 형태이다. --> 이게 트랜스포머
+
+print(attention_output)
+exit()
+
+x = GlobalAveragePooling1D()(attention_output, mask=padding_mask)
+
+x = Dense(64, activation="relu")(x)
+x = Dropout(0.2)(x)
+
+outputs = Dense(1, activation="sigmoid")(x)
+
+model = Model(inputs = inputs, outputs = outputs)
+model.summary()
+
+
+# 3 컴파일 및 훈련
+model.compile(optimizer="adam", loss = "binary_crossentropy", metrics=["accuracy", AUC()])
+
+es = EarlyStopping(monitor="val_loss", patience=5, mode="min", restore_best_weights=True)
+mcp = ModelCheckpoint(filepath=PATH, monitor="val_loss", save_best_only=True, mode="min",)
+
+start_time = time.time()
+model.fit(x_train, y_train, batch_size=16, epochs=10, callbacks=[es, mcp])
+end_time = time.time()
+
+real_time = np.round(end_time-start_time, 4)
+
+# 4 평가 및 예측
+loss, accuracy, auc = model.evaluate(x_test, y_test, batch_size=64)
+y_predict = model.predict(x_test).flatten()
+y_predict_class = (y_predict >= 0.5).astype("int32")
+print(f"정확도: {round(accuracy, 4)}, 소요시간: {real_time}")
+
+cm = confusion_matrix(y_test, y_predict_class)
+labels = ["Negative", "Positive"]
+
+cmd = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+cmd.plot(cmap="Oranges_r", xticks_rotation=45)
+plt.show()
+
+"""
+딥러닝에서 반드시 배워야 하는 핵심 인코더 모델 2가지는 오토인코더(Autoencoder, AE)와 변분 오토인코더(Variational Autoencoder, VAE)가 맞습니다. 
+말씀하신 '베리언스 인코더'는 통계학적 개념인 '변분(Variational)'이 와전된 표현으로, 정식 명칭은 변분 오토인코더입니다.
+이후 GAN
+"""
