@@ -128,7 +128,8 @@ attention_output = Dropout(0.3, name="attention_dropout")(attention_output)
 x = Add(name="attention_residual")([TP_embedding, attention_output]) 
 
 # 추가된 부분2
-# LayerNormalization은 “각 토큰 벡터의 숫자들을 일정한 기준으로 조정” 한다. ()
+# LayerNormalization은 “각 토큰 벡터의 숫자들을 일정한 기준으로 조정” 한다. 더 정확하게 말한다면, 128개의 값을 평균 0, 표편 1에 가깝게 표준화한다.
+# 만약 4차원이라고 한다면 다음과 같이 나올 수 있다. [2,4,6,8] ⟶ [−1.34,−0.45,0.45,1.34] 음수가 나왔다고 문제되진 않는다. 합계가 1이될 필요도 없다. 어차피 출력단에서 activation function 걸어줄 것이다. 
 x = LayerNormalization(axis=-1, epsilon=1e-6, name="attention_layer_norm")(x)
 
 # GlobalAveragePooling은 “여러 토큰 벡터를 하나의 문장 벡터로 요약” 한다. CNN, RNN과 마찬가지로 필수 계층은 아니다. 
