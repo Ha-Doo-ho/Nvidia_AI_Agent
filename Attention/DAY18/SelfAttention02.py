@@ -113,6 +113,9 @@ True
 True
 True
 
+--> Query를 만드는 Wᵠ 행렬은 하나가 아니고 ㅈㄴ 많기 때문에(튜닝 가능한 Parameter이다.) 다음과 같이 만들어질 것이다.
+False(0으로 패딩한 값) / True (제대로 임베딩 먹혀서 실수로 된 값)
+
 False False False False False
 False False False False False
 True  True  True  True  True
@@ -154,7 +157,7 @@ x = GlobalAveragePooling1D()(attention_output, mask=padding_mask)
 x = Dense(64, activation="relu")(x)
 x = Dropout(0.2)(x)
 
-outputs = Dense(1, activation="sigmoid")(x)
+outputs = Dense(1, activation="sigmoid")(x) # 각 열마다 sigmoid를 적용한다고 보면 된다.
 
 model = Model(inputs = inputs, outputs = outputs)
 model.summary()
