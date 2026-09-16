@@ -154,7 +154,35 @@ ffn_output = Dropout(0.2)(ffn_output)
 
 # 2번째 Residual_Connection 및 LayerNormalization
 x = x + ffn_output
-x = LayerNormalization(axis=-1, epsilon=1e-4)(x)
+x2 = LayerNormalization(axis=-1, epsilon=1e-4)(x)
+x2 = Add()([x2, ffn_output2)])
+#-------------------------------------------------------------------------------------------------- 인코더의 끝
+
+#-------------------------------------------------------------------------------------------------- 디코더의 시작
+# 디코더는 인코더가 이해한 정보를 바탕으로 최종 출력 결과(텍스트 등)를 순차적으로 생성(Generation)하는 기능을 맡는다. Attention is all you need 에 같이 들어 있다.
+
+"""
+주요 기능 및 특징 
+
+자기회귀(Auto-regressive) 생성: 이전에 생성된 토큰들을 입력으로 삼아 다음 토큰의 조건부 확률을 하나씩 예측하고 완성해 나갑니다. 
+
+마스크드 셀프 어텐션(Masked Self-Attention): 생성 과정에서 미래의 토큰 정보를 미리 보지 못하도록(Information Leakage 방지) 가려주는 역할을 합니다.
+
+인코더-디코더 어텐션(Cross-Attention): 인코더가 추출한 입력 문장의 맥락 정보와 디코더가 생성 중인 현재 상태를 연결하여 연관성이 높은 입력 정보를 참고하게 만듭니다
+
+확률 분포 출력: 선형 레이어(Linear Layer)와 소프트맥스(Softmax)를 거쳐 다음에 올 가장 적절한 토큰의 확률을 계산합니다
+"""
+decoder_inputs = Input(shape=(MAXLEN, ), dtype="int32")
+
+# Decorder의 단어 임배딩 + 위치 임베딩
+decoder_embedding = TokenAndPositionEmbedding(vocabulary_size=VOCAB, sequence_length=MAXLEN, embedding_dim=EMBEDDING_DIM, mask_zero=True)(decoder_inputs)
+
+#마스크드 셀프 어텐션(Masked Self-Attention): 생성 과정에서 미래의 토큰 정보를 미리 보지 못하도록(Information Leakage 방지) 가려주는 역할을 합니다.
+masked_attention_output = MultiHeadAttention(num_heads=3, key_dim=64,)(query=decoder_embedding, key=decoder_embedding, value=decoder_embedding, use_causal_mask=True) #use_causal_mask (인과 마스크)
+
+
+
+
 
 x = GlobalAveragePooling1D()(x)
 x = Dense(units=64, activation="relu")(x)
@@ -162,6 +190,9 @@ x = Dropout(0.3)(x)
 
 outputs = Dense(units=1, activation="sigmoid")(x)
 model = Model(inputs=inputs, outputs=outputs)
+
+
+
 
 # 3 컴파일 및 훈련
 model.compile(optimizer="adam", loss = "binary_crossentropy", metrics=["accuracy", AUC()])
