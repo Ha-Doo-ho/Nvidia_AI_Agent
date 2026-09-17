@@ -131,32 +131,46 @@ TP_EMBEDDING = TokenAndPositionEmbedding(vocabulary_size=VOCAB, sequence_length=
 # MultiheadAttention을 구성함
 # num_heads가 3이므로  W₁ᵠ. . . Wₙᵠ | W₁ᴷ. . .Wₙᴷ | W₁ⱽ. . . Wₙⱽ 환경인데, n이 3일 것이고, 각 가중치는 Q,K,V를 64차원으로 만들 가중치 행렬을 제작할 것이다. 
 # 옆에 "바다"와 "항해"라는 단어가 있으면, "아하! 나는 먹는 과일 배가 아니라, 타는 배(Ship)구나!" 하고 주변 상황(문맥)을 파악해서 정보를 잔뜩 모으는 것이다. 여기서 보통 얻을 걸 다 얻는다. 
-attention_output = MultiHeadAttention(num_heads=3, key_dim=64)(query=TP_EMBEDDING, key=TP_EMBEDDING, value=TP_EMBEDDING)
+attention_output1 = MultiHeadAttention(num_heads=3, key_dim=64)(query=TP_EMBEDDING, key=TP_EMBEDDING, value=TP_EMBEDDING)
 
 # 잔차 연결 (Residual Connection) 어텐션에서 여러 단어들에 문맥이 고려된 정보가 이미 포함되었을 수 있다. 이때, 층이 깊어지면 원본의 내용이 변질될 위험이 있다. 
 # ResNet의 핵심 아이디어인 각 계층, 대리-> 과장 -> 이사 . . . 사장 을 거치는 것이 아닌 사장으로 한번에 갈 수 있는 경로를 제공하는 것. 
 # 이 직접 경로가 핵심이다.  이 덕분에 모델이 깊어질수록, 원본을 참조 하지 못하는 경우를 최대한 줄일 수 있다. 
 # 기울기 소실 문제를 줄일 수 있다.(직접적인 정보·기울기 전달 경로를 제공하기 때문이다.) 깊은 신경망의 학습을 안정화하기 위해 사용한다.
-x = Add()([TP_EMBEDDING, attention_output]) # 혹은 그냥 x = TP_EMBEDDING + attention_output 해도 된다. 
+x1 = Add()([TP_EMBEDDING, attention_output1]) # 혹은 그냥 x = TP_EMBEDDING + attention_output 해도 된다. 
 
 # LayerNormalization
 # LayerNormalization은 “각 토큰 벡터의 숫자들을 일정한 기준으로 조정” 한다. 더 정확하게 말한다면, 128개의 값을 평균 0, 표편 1에 가깝게 표준화한다.
 # CNN의 BatchNormalization과 동일한 역할을 한다고 보면 된다. 잔차 연결과 함께, 학습을 안정화 하고 학습 가속화를 위해 사용한다. 물론 정규화는 늘 원본의 내용을 깎아낸다는 단점이 있다.
-x = LayerNormalization(epsilon=1e-5)(x)
+x1 = LayerNormalization(epsilon=1e-5)(x1)
 
 # Feed Forword
 # 단어간 관계 파악은 Attention에서 상당 부분 완료된다. 여기서는 단어 간 관계 파악을 넘어 각 토큰(단어)의 표현(차원)을 정교하게 비선형 변환하는 데, 사용한다.
 # 그 방법이 차원을 늘려서 활성화 함수 적용하고 다시 원래대로 되돌리는 것이다.
 # 역시 Attention all you need에 들어가 있다. 
-ffn_output = Dense(units=FF_DIM, activation="relu")(x)
+ffn_output = Dense(units=FF_DIM, activation="relu")(x1)
 ffn_output = Dense(units=EMBEDDING_DIM)(ffn_output)
 ffn_output = Dropout(0.2)(ffn_output)
 
 # 2번째 Residual_Connection 및 LayerNormalization
-x = x + ffn_output
-x2 = LayerNormalization(axis=-1, epsilon=1e-4)(x)
-x2 = Add()([x2, ffn_output2)])
-#-------------------------------------------------------------------------------------------------- 인코더의 끝
+x1 = x1 + ffn_output
+x1 = LayerNormalization(axis=-1, epsilon=1e-4)(x1)
+
+# ==================================================
+# Encoder 블록 2
+# ==================================================
+attention_output2 = MultiHeadAttention(num_heads=3, key_dim=64, name="encoder2_self_attention")(query=x1, key=x1, value=x1)
+
+x2 = Add(name="encoder2_attention_add")([x1, attention_output2])
+x2 = LayerNormalization(axis=-1, epsilon=1e-5)(x2)
+
+ffn_output2 = Dense(units=FF_DIM, activation="relu")(x2)
+ffn_output2 = Dense(units=EMBEDDING_DIM)(ffn_output2)
+
+x2 = Add(name="Add & Norm")([x2, ffn_output2])
+encoder_output = LayerNormalization(name="add & Norm", axis=-1, epsilon=1e-5)(x2)
+
+#-------------------------------------------------------------------------------------------------- 인코더 2개 했을 때의 끝
 
 #-------------------------------------------------------------------------------------------------- 디코더의 시작
 # 디코더는 인코더가 이해한 정보를 바탕으로 최종 출력 결과(텍스트 등)를 순차적으로 생성(Generation)하는 기능을 맡는다. Attention is all you need 에 같이 들어 있다.
@@ -180,15 +194,30 @@ decoder_embedding = TokenAndPositionEmbedding(vocabulary_size=VOCAB, sequence_le
 #마스크드 셀프 어텐션(Masked Self-Attention): 생성 과정에서 미래의 토큰 정보를 미리 보지 못하도록(Information Leakage 방지) 가려주는 역할을 합니다.
 masked_attention_output = MultiHeadAttention(num_heads=3, key_dim=64,)(query=decoder_embedding, key=decoder_embedding, value=decoder_embedding, use_causal_mask=True) #use_causal_mask (인과 마스크)
 
+decoder_x = Add(name="Add & Norm")([decoder_embedding, masked_attention_output])
+decoder_x= LayerNormalization(name="Add & Norm", axis=-1, epsilon=1e-5)(decoder_x)
 
+# Decorder의 Multi-HeadAttention 2번째 --> Cross-Attention이라고도 부른다. 인코더의 결과와 디코더의 결과를 행렬 덧샘 하기 때문이다.
+cross_attention_output = MultiHeadAttention(num_heads=3, key_dim=62, name="decoder_cross_attention")(query=decoder_x, key=encoder_output, value=encoder_output)
 
+cross_attention_output = Add(name="Add & Norm")([cross_attention_output, decoder_x])
+cross_attention_output = LayerNormalization(axis=-1, epsilon=1e-5,)(cross_attention_output)
 
+#Feed Forward
+Decoder_Feed_Forward = Dense(units=FF_DIM, activation="relu")(cross_attention_output)
+Decoder_Feed_Forward = Dense(units=EMBEDDING_DIM, activation="relu")(Decoder_Feed_Forward)
 
-x = GlobalAveragePooling1D()(x)
-x = Dense(units=64, activation="relu")(x)
-x = Dropout(0.3)(x)
+#Add & Norm
+Decorder_output = Add(name="Add & Norm")([Decoder_Feed_Forward, cross_attention_output])
+Decorder_output = LayerNormalization(axis=-1, epsilon=1e-5, name="Add & Norm")(Decorder_output)
 
-outputs = Dense(units=1, activation="sigmoid")(x)
+##########################################################################---> 디코더의 끝
+
+Decorder_output = GlobalAveragePooling1D()(Decorder_output)
+Decorder_output = Dense(units=64, activation="relu")()
+Decorder_output = Dropout(0.3)(Decorder_output)
+
+outputs = Dense(units=1, activation="sigmoid")(Decorder_output)
 model = Model(inputs=inputs, outputs=outputs)
 
 
