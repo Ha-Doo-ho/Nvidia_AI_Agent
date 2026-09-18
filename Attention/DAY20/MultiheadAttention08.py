@@ -3,7 +3,7 @@ from sklearn.model_selection import KFold, train_test_split, StratifiedKFold
 from keras.datasets import imdb
 from keras.utils import pad_sequences
 from keras.models import Sequential, load_model, Model
-from keras.layers import Input, Embedding, Add, MultiHeadAttention,LayerNormalization, Dense, Dropout, GlobalAveragePooling1D
+from keras.layers import Input, Embedding, Add, MultiHeadAttention,LayerNormalization, Dense, Dropout, Softmax
 from keras_hub.layers import PositionEmbedding, TokenAndPositionEmbedding
 from keras import ops
 from keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -194,8 +194,8 @@ decoder_embedding = TokenAndPositionEmbedding(vocabulary_size=VOCAB, sequence_le
 #마스크드 셀프 어텐션(Masked Self-Attention): 생성 과정에서 미래의 토큰 정보를 미리 보지 못하도록(Information Leakage 방지) 가려주는 역할을 합니다.
 masked_attention_output = MultiHeadAttention(num_heads=3, key_dim=64,)(query=decoder_embedding, key=decoder_embedding, value=decoder_embedding, use_causal_mask=True) #use_causal_mask (인과 마스크)
 
-decoder_x = Add(name="Add & Norm")([decoder_embedding, masked_attention_output])
-decoder_x= LayerNormalization(name="Add & Norm", axis=-1, epsilon=1e-5)(decoder_x)
+decoder_x = Add(name="decoder_masked_attention_add")([decoder_embedding, masked_attention_output])
+decoder_x= LayerNormalization(name="decoder_masked_attention_norm", axis=-1, epsilon=1e-5)(decoder_x)
 
 # Decorder의 Multi-HeadAttention 2번째 --> Cross-Attention이라고도 부른다. 인코더의 결과와 디코더의 결과를 행렬 덧샘 하기 때문이다.
 cross_attention_output = MultiHeadAttention(num_heads=3, key_dim=62, name="decoder_cross_attention")(query=decoder_x, key=encoder_output, value=encoder_output)
@@ -205,7 +205,7 @@ cross_attention_output = LayerNormalization(axis=-1, epsilon=1e-5,)(cross_attent
 
 #Feed Forward
 Decoder_Feed_Forward = Dense(units=FF_DIM, activation="relu")(cross_attention_output)
-Decoder_Feed_Forward = Dense(units=EMBEDDING_DIM, activation="relu")(Decoder_Feed_Forward)
+Decoder_Feed_Forward = Dense(units=EMBEDDING_DIM,)(Decoder_Feed_Forward)
 
 #Add & Norm
 Decorder_output = Add(name="Add & Norm")([Decoder_Feed_Forward, cross_attention_output])
@@ -213,12 +213,11 @@ Decorder_output = LayerNormalization(axis=-1, epsilon=1e-5, name="Add & Norm")(D
 
 ##########################################################################---> 디코더의 끝
 
-Decorder_output = GlobalAveragePooling1D()(Decorder_output)
-Decorder_output = Dense(units=64, activation="relu")()
-Decorder_output = Dropout(0.3)(Decorder_output)
+logits = Dense(units=VOCAB, name="output_linear")(Decorder_output)
+outputs = Softmax()(logits)
 
 outputs = Dense(units=1, activation="sigmoid")(Decorder_output)
-model = Model(inputs=inputs, outputs=outputs)
+model = Model(inputs=[inputs, decoder_inputs], outputs=outputs)
 
 
 
