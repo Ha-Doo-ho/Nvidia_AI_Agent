@@ -14,14 +14,15 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 
 # 1-1 데이터
-NUM_SAMPLES = 50000
-MAXLEN = 40
-VOCAB = 10000
+NUM_SAMPLES = 50000 # 문장 몇개 사용할 것 인지.
+MAXLEN = 40 # 의미가 2개 존재한다. 1.영어의 최대 문장, 2. [start] 부터 독일어 문장 끝까지 ([end]는 포함하지 않음.)
+VOCAB = 10000 # 단어 사전
 
 PATH = "./_data/deu.txt"
 
 # 1-2 데이터 전처리
 # pandas의 read_csv 기능으로 txt 파일이 바로 데이터프레임으로 만들 수 있다. 
+# ※ pandas에서 데이터 프레임 내부의 객체가 문자열일 경우, 내부의 객체에 접근할 때, 반드시 str로 우선 접근하고, 메서드를 붙여야 한다. 
 data_csv = pd.read_csv(filepath_or_buffer=PATH,
                    sep="\t",
                    header=None, # 파일에 열 이름이 없을 때 사용
@@ -36,14 +37,10 @@ data_csv = data_csv.drop(labels=["Attribution"], axis=1)
 print(data_csv.shape) #(331266, 2)
 print(data_csv.columns) #Index(['English', 'German'], dtype='str')
 
-# 문자열 앞뒤 공백 제거 --> 이거는 파이썬 아니더라도 많이 하는 전처리니까 알아둘 것.
+# 문자열 앞 / 뒤 공백 제거
 # "   I am tired.   " --> "I am tired." 기존 내부의 띄어쓰기는 제거 안하므로 안심할 것.
-# 컴퓨터는 위의 2개를 다른 것으로 판단하여 이 전처리는 많이 한다. 데이터에는 정말 이상한 것들이 정말 많음. 
 data_csv["English"] = data_csv["English"].str.strip() 
 data_csv["German"] = data_csv["German"].str.strip()
-# Pandas는 1차원(벡터)을 Series라고 부른다. 2차원은 DataFrame이라고 부른다. 이건 앞에서도 언급함. 
-# Series가 현재, 문자열로 이루어져 있어서 str을 붙인 것이다.  
-# .dt(날자/시간 접근자) .cat(범주형 접근자) 까지 3개가 보통 사용된다. 
 
 # 빈문장 제거
 data_csv = data_csv[
@@ -58,6 +55,7 @@ data_csv = data_csv.drop_duplicates(subset=["English", "German"])
 # 이게 인덱스에 그대로 적용되서 문제이다. 3, 0, 4를 그대로 사용할 수 없다. 다시 0, 1, 2로 바꿔야 한다. 그래서 .reset_index를 사용하는 것이다. 거의 같이 쓴다고 보면 됨.
 data_csv = data_csv.sample(n=min(NUM_SAMPLES, len(data_csv)), random_state=11).reset_index(drop=True)
 
+# ※핵심
 # 영어 --> 독일어. 영어를 독일어로 번역한다. 번역 당하는 Target Language 에서 sos, eos사용함. (번역하는 언어는 Source Language)
 # [start] Ich bin müde. [end] 모든 독일어 문장은 이렇게 된다. 
 data_csv["German"] = "[start] " + data_csv["German"] + " [end]"
@@ -85,9 +83,11 @@ GERMAN_MAXLEN = MAXLEN + 1 # --> MAXLEN은 영어 문장의 최대 길이이자,
 
 # 독일어 문장 표준화 함수 시작
 # 일반적인 문장부호 전부 제거하는 함수: punctuation
+# 그러나 [start], [end]의 대괄호는 보존해야 한다.
 strip_chars = string.punctuation
 strip_chars = strip_chars.replace("[","")
 strip_chars = strip_chars.replace("]","")
+strip_chars = re.escape(strip_chars) # 특수 문자를 escape할 수 있게 도와줌. 문법으로 읽지 않게 하는 것이다.
 #print(data_csv[["English", "German"]].head())
 
 def german_standardization(input_text):
@@ -133,10 +133,7 @@ encoder_test_tokens = english_vectorizer(x_test.to_numpy())
 german_train_tokens = german_vectorizer(y_train.to_numpy())
 german_val_tokens = german_vectorizer(y_val.to_numpy())
 german_test_tokens = german_vectorizer(y_test.to_numpy())
-
 print(german_train_tokens.shape) #(20000, 41)
-
-
 
 # 여기까지의 관계
 """ 
@@ -149,13 +146,9 @@ y_train": [start] 독일어 문장 [end]
 → german_train_tokens
 """
 
-
-# 독일어 토큰을 한 칸 차이로 나누기 
-# 디코더 인풋: [start] . . . 마지막 단어 
-# 디코더 답지: 첫단어 . . . [end]
 # 41개 전체 Target 토큰을 입력 40개와 정답 40개로 나눈다.
-decoder_train_inputs = german_train_tokens[:, :-1] # 모든 행을 가져오고 열은 마지막 빼고 가져옴
-decoder_train_labels = german_train_tokens[:, 1:] # 모든 행을 가져오고 0열 빼고 다 가져옴 
+decoder_train_inputs = german_train_tokens[:, :-1]
+decoder_train_labels = german_train_tokens[:, 1:]
 
 decoder_val_inputs = german_val_tokens[:, :-1]
 decoder_val_labels = german_val_tokens[:, 1:]
@@ -179,154 +172,6 @@ test_sample_weights = tf.cast(
     dtype=tf.float32,
 )
 
-# 문장 한 쌍이 Transformer를 통과하는 흐름
-"""
-
-1. 원본 문장
-Encoder쪽            Decoder쪽
-영어: I am tired.    독일어: Ich bin müde. 
---> 사람이 읽을 수 있는 번역 문장 쌍을 준비
-
-2. 데이터 정리
-영어: I am tired.   독일어: [start] Ich bin müde. [end]
---> 공백 · 중복(저 문장이 또 나오면 용량 잡아먹음.)을 정리하고 시작(start)과 끝(end)을 표
-
-3. 숫자로 변환
-Encoder 입력                    독일어 전체 토큰
-[21, 14, 308, 0, 0, ...]        [2, 17, 34, 522, 3, 0, ...]
---> 단어를 Embedding이 처리할 수 있는 토큰 ID로 변환
-
-4. 한칸 이동
-Decoder 입력                    Decoder 정답
-[start]  Ich   bin   müde       Ich    bin   müde  [end]
-   2     17     34   522        17     34    522     3
---> 왼쪽 토큰들을 보고 바로 다음 토큰을 맞히도록 한 칸 이동   
-
-5. Transformer 학습
-입력 흐름
-영어 → Encoder 1 → Encoder 2 → Cross-Attention
-
-출력 흐름
-앞선 독일어 → Decoder 1 → Decoder 2 → 다음 단어 확률
---> Encoder가 영어 의미를 만들고 Decoder가 독일어를 순서대로 생성   
-
---------------------------------------------------------------------------------------------
-
-반드시 이해해야 하는 것
-1. 영어–독일어 문장 쌍을 준비한다.
-
-2. 문장을 정리하고, 독일어에 [start], [end]를 붙인다.
-
-3. 문장을 토큰 번호로 바꾼다.
-
-4. 독일어 토큰을 한 칸 어긋나게 나눈다.
-
-5. Transformer가 다음 독일어 토큰을 예측한다.
-
---------------------------------------------------------------------------------------------
-★★★★ 중요한 예시 ★★★★
-ex)
-영어: I am tired.    독일어: Ich bin müde.
-
-Encoder 입력: I am tired.     Decoder 입력: [start] Ich bin müde.    정답: Ich bin müde. [end]
-
---------------------------------------------------------------------------------------------
-
-모델이 학습하는 것은 결국 다음과 같다.
-[start]를 봤으면 → Ich를 예측
-[start] Ich를 봤으면 → bin을 예측
-[start] Ich bin을 봤으면 → müde를 예측
-[start] Ich bin müde를 봤으면 → [end]를 예측
-
---------------------------------------------------------------------------------------------
-
-반드시 설명할 수 있어야 하는 것
-Encoder에는 무엇이 들어가는가?
-    영어 문장
-
-Decoder에는 무엇이 들어가는가?
-    정답 독일어 문장의 앞부분
-
-Decoder의 정답은 무엇인가?
-    한 칸 뒤의 독일어 토큰
-
-Causal Mask는 왜 필요한가?
-    아직 생성하지 않은 미래 단어를 보지 못하게 하기 위해서
-
-Cross-Attention은 무엇을 연결하는가?
-    Decoder의 현재 상태와 Encoder가 이해한 영어 문장
-
-마지막 Softmax는 무엇을 출력하는가?
-    다음에 나올 독일어 토큰별 확률
-
---------------------------------------------------------------------------------------------
-
-Cross-Attention 부분 자세히
-
-1. Encoder가 영어 문장 전체를 먼저 읽는다. 
-영어 입력이 다음과 같다고 가정: I love this movie
-
-Encoder는 문장 전체를 한꺼번에 처리해서 각 영어 위치의 문맥 벡터를 제작한다. 
-I      → encoder_output[0]
-love   → encoder_output[1]
-this   → encoder_output[2]
-movie  → encoder_output[3]
-이때 Encoder는 번역을 시작하지 않고, 영어 문장을 분석해서 Decoder가 참고할 정보를 준비할 뿐이다. 
-
-2. Decoder에는 [start]를 직접 넣는다.
-첫 번째 Decoder 입력은 Ich가 아닌, 특별 토큰 [start]이다.
-Decoder 입력: [start] 
-
-첫 번째 Cross-Attention에서는 다음과 같이 연결된다.
-Query: [start]를 처리한 Decoder 상태
-Key, Value: I / love / this / movie의 Encoder 출력 전체
-Decoder의 [start] 상태가 Encoder 전체를 확인한다. 이때 I 위치의 정보가 중요하다고 판단될 수 있다.
-
-[start] 상태
-      ↓ Cross-Attention
-I / love / this / movie 확인
-      ↓
-Ich의 확률이 가장 높아진다. 그 결과 첫번째 독일어 단어인 Ich가 새엇ㅇ된다.
-
-3. 생성된 Ich를 다음 입력에 추가한다.
-이제 Decoder의 입력은 다음과 같다.
---> [start] Ich 
-
-Decoder의 현재 상태는 단순히 Ich 하나가 아닌, 다음 문맥을 포함한다.
-“번역이 시작되었고, 주어 Ich가 나왔다.”
-
-이 상태로 다시 Encoder의 영어 문장 "전체"를 확인한다.
-Decoder Query: [start] Ich
-Encoder Key, Value: I / love / this / movie
-
-이번에는 love와 관련된 정보(위치정보, 맥락정보 등. . .)를 크게 가져와 다음 단어를 예측한다.
-예측 결과: liebe
-
-이 과정의 반복이다. 
-| 단계 | 지금까지 Decoder가 받은 입력     | 다음 예측 |
-| ---- | ------------------------------- | -------- |
-| 1    | `[start]`                       | `Ich`    |
-| 2    | `[start] Ich`                   | `liebe`  |
-| 3    | `[start] Ich liebe`             | `diesen` |
-| 4    | `[start] Ich liebe diesen`      | `Film`   |
-| 5    | `[start] Ich liebe diesen Film` | `[end]`  |
-
-핵심
-모델에게 다음 정보를 직접 알려주지는 않는다. 대신 다음만 알려준다.
-영어 문장: I love this movie
-독일어 정답: Ich liebe diesen Film
-
-모델이 예측한 결과와 정답을 비교하고 역전파를 반복하면서, love가 포함된 영어 문맥과 
-liebe가 나와야 하는 독일어 문맥 사이의 관계를 가중치에 학습하는 것
-
-따라서 Cross-Attention은 처음부터 love를 찾아가는 것이 아니다. 처음에는 무작위로 보다가, 
-liebe를 맞히도록 수많은 문장 쌍에서 학습되면서 love, I 등 필요한 위치에 주의를 주게 된다.
-
-
-english_tokens → Encoder
-decoder_inputs → Decoder
-decoder_labels → Decoder가 맞혀야 할 정답
-"""
 
 # 2 모델 구성
 EMBEDDING_DIM = 128
@@ -336,7 +181,7 @@ FF_DIM = 512
 
 # 임베딩(문자 + 위치) 뒤, Dropout
 encoder_inputs = Input(shape=(MAXLEN, ), dtype="int32", name="encoder_inputs")
-encoder_embedding = TokenAndPositionEmbedding(vocabulary_size=VOCAB, sequence_length=MAXLEN, embedding_dim=EMBEDDING_DIM, mask_zero=True, name="encoder_embedding")(encoder_inputs)
+encoder_embedding = TokenAndPositionEmbedding(vocabulary_size=ENGLISH_VOCAB_SIZE, sequence_length=MAXLEN, embedding_dim=EMBEDDING_DIM, mask_zero=True, name="encoder_embedding")(encoder_inputs)
 encoder_x = Dropout(rate=0.1)(encoder_embedding)
 
 # Encoder Self_attention --> Query, Key, Value가 모두 자기 자신
@@ -373,7 +218,7 @@ encoder2_output = LayerNormalization(axis=-1, epsilon=1e-5)(x2)
 
 # Decoder input & 단어,Positional_Encoding
 decoder_inputs = Input(shape=(MAXLEN, ), dtype="int32", name="decoder_input")
-decoder_embedding = TokenAndPositionEmbedding(vocabulary_size=VOCAB, sequence_length=GERMAN_MAXLEN, embedding_dim=EMBEDDING_DIM, mask_zero=True)(decoder_inputs)
+decoder_embedding = TokenAndPositionEmbedding(vocabulary_size=GERMAN_VOCAB_SIZE, sequence_length=MAXLEN, embedding_dim=EMBEDDING_DIM, mask_zero=True)(decoder_inputs)
 
 # Masked Multi-Head Attention
 dx1 = MultiHeadAttention(num_heads=NUM_HEADS, key_dim=KEY_DIM, dropout=0.1)(query=decoder_embedding, key=decoder_embedding, value=decoder_embedding, use_causal_mask=True)
@@ -394,7 +239,83 @@ decoder_feed_forward = Dense(units=EMBEDDING_DIM)(decoder_feed_forward)
 
 # Add & Norm
 decoder_output = Add()([dx2, decoder_feed_forward])
-decoder_output = LayerNormalization(axis=-1, epsilon=1e-5)(decoder_output)
+decoder1_output = LayerNormalization(axis=-1, epsilon=1e-5)(decoder_output)
+
+# --------------------------------------------------
+# Decoder 블록 2
+# --------------------------------------------------
+
+decoder_masked_attention2 = MultiHeadAttention(
+    num_heads=NUM_HEADS,
+    key_dim=KEY_DIM,
+    dropout=0.1,
+    name="decoder2_masked_self_attention",
+)(
+    query=decoder1_output,
+    key=decoder1_output,
+    value=decoder1_output,
+    use_causal_mask=True,
+)
+
+dx2 = Add(name="decoder2_masked_attention_add")([
+    decoder1_output,
+    decoder_masked_attention2,
+])
+
+dx2 = LayerNormalization(
+    axis=-1,
+    epsilon=1e-5,
+    name="decoder2_masked_attention_norm",
+)(dx2)
+
+decoder_cross_attention2 = MultiHeadAttention(
+    num_heads=NUM_HEADS,
+    key_dim=KEY_DIM,
+    dropout=0.1,
+    name="decoder2_cross_attention",
+)(
+    query=dx2,
+    key=encoder2_output,
+    value=encoder2_output,
+)
+
+dx2_cross = Add(name="decoder2_cross_attention_add")([
+    dx2,
+    decoder_cross_attention2,
+])
+
+dx2_cross = LayerNormalization(
+    axis=-1,
+    epsilon=1e-5,
+    name="decoder2_cross_attention_norm",
+)(dx2_cross)
+
+decoder_ffn2 = Dense(
+    units=FF_DIM,
+    activation="relu",
+    name="decoder2_ffn_expand",
+)(dx2_cross)
+
+decoder_ffn2 = Dense(
+    units=EMBEDDING_DIM,
+    name="decoder2_ffn_restore",
+)(decoder_ffn2)
+
+decoder_ffn2 = Dropout(
+    rate=0.1,
+    name="decoder2_ffn_dropout",
+)(decoder_ffn2)
+
+decoder2_output = Add(name="decoder2_ffn_add")([
+    dx2_cross,
+    decoder_ffn2,
+])
+
+decoder2_output = LayerNormalization(
+    axis=-1,
+    epsilon=1e-5,
+    name="decoder2_ffn_norm",
+)(decoder2_output)
 
 # Linear
 logits = Dense(units=GERMAN_VOCAB_SIZE, name="output_linear")(decoder_output)
@@ -412,13 +333,69 @@ es = EarlyStopping(monitor="val_loss", patience=5, mode="min", restore_best_weig
 mcp = ModelCheckpoint(filepath="./_save/keras_Attention_Eng_to_German01.keras", monitor="val_loss",mode="min", save_best_only=True)
 
 start = time.time()
-model.fit(x_train, y_train, batch_size=64, epochs=10, callbacks=[es, mcp], validation_data=(x_val, y_val), shuffle=True)
+model.fit(x=[encoder_train_tokens, decoder_train_inputs], y=decoder_train_labels, batch_size=64, epochs=10, callbacks=[es, mcp], validation_data=([encoder_val_tokens, decoder_val_inputs], decoder_val_labels, val_sample_weights), shuffle=True)
 end = time.time()
 
 real_time = np.round(end-start, 4)
 
 # 4 평가 및 예측
+test_result = model.evaluate(
+    x=[encoder_test_tokens, decoder_test_inputs],
+    y=decoder_test_labels,
+    sample_weight=test_sample_weights,
+    batch_size=64,
+    return_dict=True,
+)
+
+print("테스트 결과:", test_result)
+
+def translate_sentence(english_sentence):
+    """영어 문장 하나를 독일어로 순차 생성한다."""
+
+    encoder_tokens = english_vectorizer(
+        tf.constant([english_sentence])
+    )
+
+    decoded_words = ["[start]"]
+
+    for position in range(MAXLEN):
+        decoder_text = " ".join(decoded_words)
+
+        # German vectorizer는 41개를 출력하므로 마지막 열을 제거해
+        # 모델의 Decoder 입력 길이 40개로 맞춘다.
+        decoder_tokens = german_vectorizer(
+            tf.constant([decoder_text])
+        )[:, :-1]
+
+        predictions = model.predict(
+            [encoder_tokens, decoder_tokens],
+            verbose=0,
+        )
+
+        next_token_id = int(
+            tf.argmax(
+                predictions[0, position, :],
+                axis=-1,
+            )
+        )
+
+        next_word = german_vocabulary[next_token_id]
+
+        if next_word == "[end]":
+            break
+
+        decoded_words.append(next_word)
+
+    return " ".join(decoded_words[1:])
 
 
+for sample_index in range(5):
+    english_sentence = x_test.iloc[sample_index]
+    real_german_sentence = y_test.iloc[sample_index]
+    predicted_german_sentence = translate_sentence(
+        english_sentence
+    )
 
-
+    print("\n영어:", english_sentence)
+    print("실제 독일어:", real_german_sentence)
+    print("예측 독일어:", predicted_german_sentence)
