@@ -193,7 +193,7 @@ x1 = LayerNormalization(axis=-1, epsilon=1e-5, name="encoder1_attention_norm")(x
 
 # FeedForward
 ffn_forward = Dense(units=FF_DIM, activation="relu")(x1)
-ff_forward = Dense(units=EMBEDDING_DIM)(ffn_forward)
+ffn_forward = Dense(units=EMBEDDING_DIM)(ffn_forward)
 ffn_forward = Dropout(rate=0.1)(ffn_forward)
 
 # Add & Norm
@@ -318,7 +318,7 @@ decoder2_output = LayerNormalization(
 )(decoder2_output)
 
 # Linear
-logits = Dense(units=GERMAN_VOCAB_SIZE, name="output_linear")(decoder_output)
+logits = Dense(units=GERMAN_VOCAB_SIZE, name="output_linear")(decoder2_output)
 # (None, 40, GERMAN_VOCAB_SIZE)
 
 # Softmax
@@ -327,13 +327,13 @@ outputs = Softmax(axis=-1,name="output_softmax")(logits)
 model = Model(inputs=[encoder_inputs,decoder_inputs], outputs=outputs)
 
 # 3 컴파일 및 훈련
-model.compile(optimizer="adam", loss="sparse_categorical_crossentropy",metrics=["accuracy", AUC()])
+model.compile(optimizer="adam", loss="sparse_categorical_crossentropy",metrics=["accuracy"])
 
 es = EarlyStopping(monitor="val_loss", patience=5, mode="min", restore_best_weights=True)
 mcp = ModelCheckpoint(filepath="./_save/keras_Attention_Eng_to_German01.keras", monitor="val_loss",mode="min", save_best_only=True)
 
 start = time.time()
-model.fit(x=[encoder_train_tokens, decoder_train_inputs], y=decoder_train_labels, batch_size=64, epochs=10, callbacks=[es, mcp], validation_data=([encoder_val_tokens, decoder_val_inputs], decoder_val_labels, val_sample_weights), shuffle=True)
+model.fit(x=[encoder_train_tokens, decoder_train_inputs], y=decoder_train_labels, sample_weight=train_sample_weights, batch_size=16, epochs=50, callbacks=[es, mcp], validation_data=([encoder_val_tokens, decoder_val_inputs], decoder_val_labels, val_sample_weights), shuffle=True)
 end = time.time()
 
 real_time = np.round(end-start, 4)
