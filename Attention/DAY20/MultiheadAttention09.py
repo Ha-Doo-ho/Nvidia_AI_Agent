@@ -286,7 +286,7 @@ Decoder의 [start] 상태가 Encoder 전체를 확인한다. 이때 I 위치의 
       ↓ Cross-Attention
 I / love / this / movie 확인
       ↓
-Ich의 확률이 가장 높아진다. 그 결과 첫번째 독일어 단어인 Ich가 새엇ㅇ된다.
+Ich의 확률이 가장 높아진다. 그 결과 첫번째 독일어 단어인 Ich가 생성된다.
 
 3. 생성된 Ich를 다음 입력에 추가한다.
 이제 Decoder의 입력은 다음과 같다.

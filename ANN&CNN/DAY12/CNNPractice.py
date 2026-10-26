@@ -24,7 +24,7 @@ cnn_model = Sequential() #NN 을 여기서 만듦
 cnn_model.add(Input(shape=(28,28,1))) #데이터 개수 무시 행/열/차원우선 암기할 것. 
 cnn_model.add(Conv2D(filters=32, kernel_size=3, strides=1, padding = "same", activation="relu"))
 cnn_model.add(BatchNormalization())
-cnn_model.add(MaxPool2D(2))
+cnn_model.add(MaxPool2D(2)) #오버피팅, 강한 구간 탐지, 위치정보에 대한 의존성 감소.,.. pooling
 
 cnn_model.add(Conv2D(filters=64, kernel_size=3, padding="same", activation="relu"))
 cnn_model.add(BatchNormalization())

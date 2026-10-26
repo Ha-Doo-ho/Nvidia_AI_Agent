@@ -141,7 +141,7 @@ x_train: 영어 문자열
 → english_vectorizer
 → encoder_train_tokens
 
-y_train": [start] 독일어 문장 [end]
+y_train: [start] 독일어 문장 [end]
 → german_vectorizer
 → german_train_tokens
 """
@@ -220,7 +220,7 @@ encoder2_output = LayerNormalization(axis=-1, epsilon=1e-5)(x2)
 decoder_inputs = Input(shape=(MAXLEN, ), dtype="int32", name="decoder_input")
 decoder_embedding = TokenAndPositionEmbedding(vocabulary_size=GERMAN_VOCAB_SIZE, sequence_length=MAXLEN, embedding_dim=EMBEDDING_DIM, mask_zero=True)(decoder_inputs)
 
-# Masked Multi-Head Attention
+# Masked Multi-Head Attention (Cross-Multi-Head Attention 아님!)
 dx1 = MultiHeadAttention(num_heads=NUM_HEADS, key_dim=KEY_DIM, dropout=0.1)(query=decoder_embedding, key=decoder_embedding, value=decoder_embedding, use_causal_mask=True)
 
 # Add & Norm
@@ -240,6 +240,7 @@ decoder_feed_forward = Dense(units=EMBEDDING_DIM)(decoder_feed_forward)
 # Add & Norm
 decoder_output = Add()([dx2, decoder_feed_forward])
 decoder1_output = LayerNormalization(axis=-1, epsilon=1e-5)(decoder_output)
+
 
 # --------------------------------------------------
 # Decoder 블록 2

@@ -25,6 +25,7 @@ Decoder에 z 전달
 첫 번째 축으로는 0.2 정도, 두 번째 축으로는 0.4 정도 퍼진 분포를 가진다.A
 
 qΦ(z | x) = N( [ 2.0, -1.0 ], [ 0.2², 0.4² ] ) 로 표현되며 실제로는 여러 z가 나올 수 있다. 그 분포에서 뽑으므로 
+Φ → 학습 가능한 파라미터를 보통 w라고 하는데, 여기서는 Φ 라고 함.
 """
 import tensorflow as tf 
 import numpy as np
@@ -35,12 +36,15 @@ from keras.models import Sequential, load_model, Model
 from keras.layers import Input, Dense, Layer
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
+from keras import ops #Operations(연산)의 줄임말
+import matplotlib.pyplot as plt
+
 
 # 1-1 데이터
 (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
 
 # 1-2 데이터 전처리
-# 이미지는 "초고차원 상의 한 점" 이라는 것을 무조건 가정하고 들어가야 함. --> 한 점 = 좌표로 표현 가능 = 좌표는 벡터로 표현함.
+# 이미지는 "초고차원 상의 한 점"  --> 한 점 = 좌표로 표현 가능 = 좌표는 벡터로 표현함.
 # 벡터 형태로 reshape 해야 한다. 기존 CNN은 위치 정보를 살리기 위해, -1, 28, 28, 1로 넣었다. 
 """ 
 예를 들어 결과가 다음과 같다고 가정하자. 
@@ -101,13 +105,22 @@ class Sampling(Layer):
         """
         z = z_mean + z_std * epsilon 
         
+        # KL Divergence
+        # 잠재축별 KL 손실을 합산한다.
+        kl_loss = -0.5 * tf.reduce_sum(1 + z_log_var -tf.math.square(z_mean)-tf.math.exp(z_log_var) ,axis=1)
+        
+        # 배치에 포함된 이미지들의 KL 손실 평균
+        kl_loss = tf.reduce_mean(kl_loss)
+        
+        # 전체 모델의 손실에 KL Loss를 자동으로 추가
+        self.add_loss(kl_loss) # keras에게 "이 계층에서 계산한 kl_loss도 모델이 최소화할 전체 손실에 포함하라." 고 알려준다.
         return z 
 
 encoder_inputs = Input(shape=(28 * 28 * 1, )) # Dense층에 넣기 위해, 벡터의 형태로 들어감
 encoder_x = Dense(units=128, activation="relu")(encoder_inputs)
 
 
-#잠재벡터의 평균 --> 로그 분산과 마찬가지로 양,음수 가능해야 하므로 활성함수를 걸어 출력 범위를 제한하지 않았다.
+#잠재벡터의 평균 (μ) --> 로그 분산과 마찬가지로 양,음수 가능해야 하므로 활성함수를 걸어 출력 범위를 제한하지 않았다.
 z_mean = Dense(units=LATENT_DIM, name="z_mean")(encoder_x)
 
 #잠재벡터의 log(분산) --> 분산은 음수가 될 수 없다. 일반적인 Dense출력은 음수가 나올 수 있다. log분산은 음수가 가능하다. 
@@ -138,9 +151,105 @@ decoder = Model(inputs=decoder_inputs, outputs=decoder_outputs, name="decoder")
 reconstructed_outputs = decoder(z)
 
 # Encoder와 Decoder가 연결된 전체 VAE 구조
-# inputs는 인코더에 들어갈 것, 아웃풋은 decoder에 encoder을 통해 얻은 잠재벡터 z 이다.
+# 전체 VAE 입력은 원본 이미지 encoder_inputs이다.
+# z는 Encoder와 Decoder 사이에 있는 잠재벡터이다.
+# 전체 VAE 출력은 Decoder가 복원한 이미지 reconstructed_outputs이다.
 VAE = Model(inputs=encoder_inputs, outputs = reconstructed_outputs, name="VAE")
 VAE.summary()
+
+# ===========================================================
+# 손실함수
+# ===========================================================
+def reconstruction_loss(y_true, y_pred):
+      pixel_loss = ops.binary_crossentropy(target=y_true, output=y_pred) # loss: 차이, 손실, 비용, cost . . .
+      image_loss = ops.sum(pixel_loss, axis=1)
+      
+      return image_loss
+# BCE: 0~1로 정규화된 원본 픽셀과 복원 픽셀을 비교하는 것이며 이진분류용으로 사용하는 것이 아님.
+# 손실이 얼마나 나는지를 알 수 있다. 원본 출력을 비교하기 때문에.
+
+
 # 3 컴파일 및 훈련
+VAE.compile(optimizer="adam", loss=reconstruction_loss)
+es = EarlyStopping(monitor="val_loss",patience=10, mode="min", restore_best_weights=True)
+
+start_time = time.time()
+history = VAE.fit(x_train, x_train, validation_data=(x_val, x_val), epochs=50, batch_size=128, callbacks=[es], shuffle=True) #VAE에서는 정답이 클래스 라벨이 아니라 원본 이미지 이므로 입력/정답 이 같다.
+end_time = time.time()
 
 # 4 평가 및 예측
+test_loss = VAE.evaluate(x_test, x_test, batch_size=128, verbose=1)
+#test_loss에 있는 것: Test Total Loss = Test Reconstruction Loss + Test KL Loss
+
+NUM_IMAGES = 10
+
+reconstructed_images = VAE.predict(x_test[:NUM_IMAGES])
+
+plt.figure(figsize=(15, 4))
+
+for i in range(NUM_IMAGES):
+
+    # 원본 이미지
+    plt.subplot(2, NUM_IMAGES, i + 1)
+    plt.imshow(
+        x_test[i].reshape(28, 28),
+        cmap="gray",
+        vmin=0,
+        vmax=1
+    )
+    plt.axis("off")
+
+    # 복원 이미지
+    plt.subplot(2, NUM_IMAGES, NUM_IMAGES + i + 1)
+    plt.imshow(
+        reconstructed_images[i].reshape(28, 28),
+        cmap="gray",
+        vmin=0,
+        vmax=1
+    )
+    plt.axis("off")
+
+plt.tight_layout()
+plt.show()
+
+# ===========================================================
+# 5 새로운 이미지 생성
+# ===========================================================
+
+NUM_GENERATED_IMAGES = 10
+
+# 표준정규분포 N(0, I)에서 새로운 잠재벡터를 뽑는다.
+random_z = np.random.normal(
+    loc=0.0,                     # 평균 0
+    scale=1.0,                   # 표준편차 1
+    size=(NUM_GENERATED_IMAGES, LATENT_DIM)
+).astype("float32")
+
+print("random_z shape:", random_z.shape)
+# (10, 2)
+
+# Encoder를 거치지 않고 Decoder에 직접 전달
+generated_images = decoder.predict(
+    random_z,
+    verbose=0
+)
+
+print("generated_images shape:", generated_images.shape)
+# (10, 784)
+
+plt.figure(figsize=(15, 2))
+
+for i in range(NUM_GENERATED_IMAGES):
+    plt.subplot(1, NUM_GENERATED_IMAGES, i + 1)
+
+    plt.imshow(
+        generated_images[i].reshape(28, 28),
+        cmap="gray",
+        vmin=0,
+        vmax=1
+    )
+
+    plt.axis("off")
+
+plt.tight_layout()
+plt.show()
