@@ -7,7 +7,7 @@
  
 # Sampling 계층을 구현해보자.
 """
-잠재벡터를 중심으로 하여 표준편차만큼 퍼진 분포에서 뽑아본다. 그것이 이미지를 잘 생성(뽑을)할 확률이 높은 곳이기 때문이다. 
+Encoder가 예측한 평균 "μ를 중심으로 잠재분포를 만들고", 그 분포에서 잠재벡터 z를 샘플링한다. 그것이 이미지를 잘 생성(뽑을)할 확률이 높은 곳이기 때문이다. 
 
 입력 이미지 x
       ↓ Encoder
@@ -57,7 +57,7 @@ import matplotlib.pyplot as plt
 x_train = x_train.reshape(-1, 28 * 28 * 1).astype("float32") / 255.0
 x_test = x_test.reshape(-1, 28 * 28 * 1).astype("float32") / 255.0
 
-x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, train_size=0.8, random_state=1, shuffle=True)
+x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, train_size=0.8, random_state=11, shuffle=True)
 print(x_train.shape, x_test.shape, y_train.shape, y_test.shape) #(48000, 784) (10000, 784) (48000,) (10000,)
 
 # 2 모델 구성
@@ -174,7 +174,7 @@ VAE.compile(optimizer="adam", loss=reconstruction_loss)
 es = EarlyStopping(monitor="val_loss",patience=10, mode="min", restore_best_weights=True)
 
 start_time = time.time()
-history = VAE.fit(x_train, x_train, validation_data=(x_val, x_val), epochs=50, batch_size=128, callbacks=[es], shuffle=True) #VAE에서는 정답이 클래스 라벨이 아니라 원본 이미지 이므로 입력/정답 이 같다.
+history = VAE.fit(x_train, x_train, validation_data=(x_val, x_val), epochs=100, batch_size=128, callbacks=[es], shuffle=True) #VAE에서는 정답이 클래스 라벨이 아니라 원본 이미지 이므로 입력/정답 이 같다.
 end_time = time.time()
 
 # 4 평가 및 예측
@@ -210,6 +210,7 @@ for i in range(NUM_IMAGES):
     plt.axis("off")
 
 plt.tight_layout()
+plt.suptitle( "Top: Original Images / Bottom: Reconstructed Images")
 plt.show()
 
 # ===========================================================
@@ -252,4 +253,5 @@ for i in range(NUM_GENERATED_IMAGES):
     plt.axis("off")
 
 plt.tight_layout()
+plt.suptitle("New Images Generated from Random Latent Vectors")
 plt.show()

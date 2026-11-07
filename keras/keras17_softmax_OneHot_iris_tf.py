@@ -31,7 +31,7 @@ print(datasets.feature_names) # 빠르게 열에 어떤 데이터 특성이 있�
 x = datasets.data 
 y = datasets.target
 # print("x: ",x)
-# print("y: ",y)
+print("y: ",y)
 
 print(x.shape, y.shape) #(150, 4) (150,)
 #exit()
@@ -40,7 +40,7 @@ print(np.unique(y, return_counts=True)) #(array([0, 1, 2]), array([50, 50, 50]))
 ########## onehot 01 판다스 이용 ###########
 y = pd.get_dummies(y) #
 print(y)#IT에서 true:1, false: 0이니까 당연한 것이다.
-#exit()  
+exit()  
 
 ######### onehot 02 tensorflow이용 #######
 #y = to_categorical(y) 이건 조금 더 가독성 있게 나온다. 

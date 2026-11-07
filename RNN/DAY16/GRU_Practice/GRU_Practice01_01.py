@@ -10,6 +10,7 @@ from keras.utils import pad_sequences
 from keras.models import Sequential
 from keras.layers import Input, Embedding, GRU, Dense, Dropout
 from keras.callbacks import EarlyStopping
+from keras.metrics import AUC
 
 
 # 1. 데이터
