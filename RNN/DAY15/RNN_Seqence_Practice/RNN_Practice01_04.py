@@ -13,6 +13,7 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.metrics import AUC
 from keras.datasets import imdb
 
+
 """
 RNN에서 문자 임베딩을 하기 위해 필요한 것은 --> 패딩 혹은 truncate / 마스킹
 정헤진 길이로 맞추어야 하는데, 만약 문장 길이가 정해진 길이보다 짧으면, 패딩이며(앞 혹은 뒤) 길면 truncating(앞 혹은 뒤) 으로 잘라야 함. 

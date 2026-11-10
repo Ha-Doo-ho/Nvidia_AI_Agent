@@ -4,6 +4,8 @@
 실제 STNNet 전체 구현이나 논문 성능 재현이 아닙니다.
 실행: python dronecrowd_customcnn_style.py
 필요 패키지: torch
+
+Density Map 예측 부분만 단순화한 실습 모델입니다.
 """
 import random
 
