@@ -63,7 +63,7 @@ def make_toy_data(num_samples=80, img_size=32):
     )
 
     for _ in range(num_samples):
-        num_people = random.randint(1, 4)
+        num_people = random.randint(1, 32)
         dx, dy = random.randint(-2, 2), random.randint(-2, 2)
         points_prev = [
             (random.randint(6, img_size - 7), random.randint(6, img_size - 7))
@@ -114,27 +114,27 @@ class CustomCNN(Module):
         """__init__ 에서 계층 정의, forward에서 실제 사용."""
         
         # 2-1. 특징 추출: 동일한 self.features를 두 프레임(t-1, t)에 적용 → 가중치 공유
-        # 논문 구성의 공유 VGG-16 두 갈래이다. 
+        # ※ 논문 구성의 공유 VGG-16 두 갈래이다. 
         # U-Net그림에서는 파란색 박스 하나가 Conv(3x3), BatchNorm, Relu를 하나로 묶은 것이다. 
         # U-Net그림 보면 그 파란 박스가 두개씩 있다. 그래서  Conv(3x3), BatchNorm, Relu 를 한번 더 만들면 된다.
         self.features = Sequential(
-            Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding="same"),
-            ReLU(),
-            BatchNorm2d(num_features=8),
-            MaxPool2d(kernel_size=2),
+            Sequential(Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding="same"),
+                        ReLU(),
+                        BatchNorm2d(num_features=8),
+                        MaxPool2d(kernel_size=2)), # features[0]
             
-            Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding="same"),
-            ReLU(),
-            BatchNorm2d(num_features=16),
-            MaxPool2d(kernel_size=2),
+            Sequential(Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding="same"),
+                        ReLU(),
+                        BatchNorm2d(num_features=16),
+                        MaxPool2d(kernel_size=2)), # features[1]
 
-            Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding="same"),
-            ReLU(),
-            BatchNorm2d(num_features=8),
-            MaxPool2d(kernel_size=2),
+            Sequential(Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding="same"),
+                        ReLU(),
+                        BatchNorm2d(num_features=32),
+                        MaxPool2d(kernel_size=2)), # features[2]
         )
         
-        # 2-2 U-Net 형태 특징 융합: 깊은 특징을 확대해 얕은 특징과 cat
+        # 2-2 U-Net 형태 특징 융합: 특징 채널을 변환(48 --> 16 Deconv아님.), 깊은 특징을 확대해 얕은 특징과 cat
         self.fusion2 = Sequential(
             Conv2d(in_channels=32 + 16, out_channels=16, kernel_size=3, padding="same"),
             ReLU(), # 채널의 가로 새로 크기를 2배 늘리는 Upsample(32)과 그걸 더하는(32+16) Concat이 합쳐져 있다.  
@@ -146,7 +146,7 @@ class CustomCNN(Module):
         )
         
         self.final_upsample = Sequential(
-            Upsample(scale_factor=2, mode="bilinear", align_corners=False),
+            Upsample(scale_factor=2, mode="bilinear", align_corners=False), #Upsample 부분. interpolate와 함께 Upsample(높이/너비 늘이기)구현한 방법이다. 즉, 구현 방법이 2가지인 것.
             Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding="same"),
             ReLU()
         )   # 16 x 16 --> 32 x 32. 마지막의 final_upsample에는 torch.cat이 없으므로 in_channel과 out_channel이 같음.
@@ -177,9 +177,9 @@ class CustomCNN(Module):
         f2 = self.features[1](f1)  # (B, 16, 8, 8)
         f3 = self.features[2](f2)  # (B, 32, 4, 4)
         
-        f3_up = interpolate(f3, size=f2.shape[-2:], mode="bilinear", align_corners=False)
+        f3_up = interpolate(f3, size=f2.shape[-2:], mode="bilinear", align_corners=False) # 논문과는 약간 다르다. 논문의 Deconv 부분, Upsample부분이 여기이다. 
         
-        fused2 = cat([f3_up, f2], dim=1)
+        fused2 = cat(tensors=[f3_up, f2], dim=1)
         fused2 = self.fusion2(fused2)
         
         fused2_up = interpolate(fused2, size=f1.shape[-2:], mode="bilinear", align_corners=False)
@@ -188,6 +188,24 @@ class CustomCNN(Module):
         fused1 = self.fusion1(fused1)          # (B,8,16,16)
         
         return self.final_upsample(fused1)   # (B,8,32,32)
+    
+    def forward(self, x):
+            """x shape: (B,2,3,32,32) -> density / localization (B,2,1,32,32)."""
+            frame_prev = x[:, 0]             # (B,3,32,32)
+            frame_curr = x[:, 1]             # (B,3,32,32)
+    
+            # 동일한 CNN 사용 = Siamese, 서로 독립된 CNN 두 개를 생성하지 않음.
+            features_prev = self.extract_features(frame_prev)
+            features_curr = self.extract_features(frame_curr)
+    
+            density_prev = self.density_head(features_prev)
+            density_curr = self.density_head(features_curr)
+            loc_prev = self.localization_head(features_prev)
+            loc_curr = self.localization_head(features_curr)
+    
+            pred_density = torch.stack([density_prev, density_curr], dim=1)
+            pred_location = torch.stack([loc_prev, loc_curr], dim=1)
+            return pred_density, pred_location
     
 # 3. 컴파일/훈련: train()은 딱 1 epoch만 실행, epoch 반복은 외부에서 수행
 # Loss는 교육용 임시 수식: 논문의 L_den + L_loc + L_ass 재현 아님.
@@ -274,7 +292,7 @@ if __name__ == "__main__":
         assert torch.isfinite(ploc).all() and ploc.min() >= 0 and ploc.max() <= 1
 
     # 4. epoch는 train() 함수 밖에서 관리함 (fit() 만들지 않음)
-    epoch = 15
+    epoch = 30
     train_loss_list = []
     val_loss_list = []
     val_mae_list = []
