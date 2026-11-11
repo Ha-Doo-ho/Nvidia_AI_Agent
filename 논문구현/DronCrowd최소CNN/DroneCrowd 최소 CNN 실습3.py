@@ -21,7 +21,7 @@ import torch
 from torch import tensor, cat
 from torch.nn import (
     Module, Sequential, Conv2d, ReLU, BatchNorm2d,
-    MaxPool2d, Upsample, Softplus, MSELoss, ConvTranspose2d, Sigmoid
+    MaxPool2d, Upsample, Softplus, MSELoss, ConvTranspose2d, Sigmoid, 
 )
 from torch.optim import Adam
 from torch.utils.data import TensorDataset, DataLoader
@@ -197,12 +197,16 @@ class CustomCNN(Module):
             # 동일한 CNN 사용 = Siamese, 서로 독립된 CNN 두 개를 생성하지 않음.
             features_prev = self.extract_features(frame_prev)
             features_curr = self.extract_features(frame_curr)
-    
+
+            # Density Map 생성
             density_prev = self.density_head(features_prev)
             density_curr = self.density_head(features_curr)
+            
+            # Localization Heatmap 생성
             loc_prev = self.localization_head(features_prev)
             loc_curr = self.localization_head(features_curr)
-    
+            
+            # 두 프레임 결과를 하나로 결합
             pred_density = torch.stack([density_prev, density_curr], dim=1)
             pred_location = torch.stack([loc_prev, loc_curr], dim=1)
             return pred_density, pred_location
@@ -223,10 +227,15 @@ def train(device, model, train_DataLoader, loss_fn, optimizer):
         pred_density, pred_loc = model(x)
 
         # 단순 학습 Loss: 일단 동작을 확인하고, 다음 차례에 논문 정식 수식을 분석한다.
+        # Density Map의 "픽셀별 오차"
         map_loss = loss_fn(pred_density, y_density)
         location_loss = loss_fn(pred_loc, y_loc)
-        pred_count = pred_density.sum(dim=(2, 3, 4))
+        
+        # Density Map의 전체 합계로 계산한 "인원 수 오차"
+        pred_count = pred_density.sum(dim=(2, 3, 4)) # (Batch, 프레임, 채널, 행, 열) 순이므로  그 loss를 계산한 할 수 있는 채널(dim=2) 부터 하는 것이다. 
         true_count = y_density.sum(dim=(2, 3, 4))
+        
+        # count_loss는 실습에 추가한 손실이며, 원 논문의 Density Loss 수식 (2)에 명시적으로 포함된 항목은 아님.
         count_loss = (pred_count - true_count).abs().mean()
         loss = 100.0 * map_loss + 0.5 * location_loss + 0.1 * count_loss
 
