@@ -18,17 +18,17 @@ import glob
 import cv2
 
 # 프로젝터 폴더 기준으로 원본 폴더와 결과 폴더를 지정한다.
-IMGS_DIR = "./_data/keggle_dataset1/images"
-MASKS_DIR = "./_data/keggle_dataset1/masks"
-OUTPUT_DIR = "./_data/keggle_dataset1/output"
-TARGET_SIZE = 512
+# IMGS_DIR = "./_data/keggle_dataset1/images"
+# MASKS_DIR = "./_data/keggle_dataset1/masks"
+# OUTPUT_DIR = "./_data/keggle_dataset1/output"
+# TARGET_SIZE = 512
 
-# 두 폴더에서 TIFF 경로를 찾고, 같은 파일명 순으로 정렬한다. 
-img_paths = glob.glob(os.path.join(IMGS_DIR, "*.tif"))
-mask_paths = glob.glob(os.path.join(MASKS_DIR, "*.tif"))
+# # 두 폴더에서 TIFF 경로를 찾고, 같은 파일명 순으로 정렬한다. 
+# img_paths = glob.glob(os.path.join(IMGS_DIR, "*.tif"))
+# mask_paths = glob.glob(os.path.join(MASKS_DIR, "*.tif"))
 
-img_paths.sort()
-mask_paths.sort()
+# img_paths.sort()
+# mask_paths.sort()
 
 # 자른 타일을 저장할 output 폴더를 처음 한 번 생성한다.
 # os.makedirs(OUTPUT_DIR)
@@ -62,6 +62,7 @@ mask_paths.sort()
 
 #     print("Processed {} {}/{}".format(img_filename, i + 1, len(img_paths)))
 
+# 1. 데이터 
 output_dir = Path("./_data/keggle_dataset1/output")
 image_paths = sorted(output_dir.glob("*.jpg"))[:8]
 
@@ -111,3 +112,55 @@ print("한 쌍:", x.shape, y.shape)
 practice_loader = DataLoader(practice_dataset, batch_size=4, shuffle=True)
 x_batch, y_batch = next(iter(practice_loader))
 print("첫 배치:", x_batch.shape, y_batch.shape)
+
+# 2 모델구성
+class CustomCNN(Module):
+    def __init__(self):
+        super(CustomCNN).__init__()
+        
+        self.features = Sequential(
+            Sequential(
+                Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding="same"),
+                ReLU(),
+                BatchNorm2d(num_features=8),
+                MaxPool2d(kernel_size=2)
+            ),
+            
+            Sequential(
+                Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding="same"),
+                ReLU(),
+                BatchNorm2d(num_features=16),
+                MaxPool2d(kernel_size=2)
+            ),
+            
+            Sequential(
+                Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding="same"),
+                ReLU(),
+                BatchNorm2d(num_features=32),
+                MaxPool2d(kernel_size=2)
+            )
+        )
+        
+        self.fusion2 = Sequential(
+            Conv2d(in_channels=32 + 16, out_channels=16, kernel_size=3, padding="same"),
+            ReLU()
+        )
+        
+        self.fusion1 = Sequential(
+            Conv2d(in_channels=16 + 8, out_channels=8, kernel_size=3, padding="same"),
+            ReLU() 
+        )
+        
+        self.final_upsample = Sequential(
+            Upsample(scale_factor=2, str="bilinear", align_corners=False),
+            Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding="same"),
+            ReLU()
+        )
+        
+        # 각 픽셀의 특징 8개를 수역 점수 하나로 바꿉니다.
+        self.water_head = Conv2d(8, 1, kernel_size=1) # 수역이냐 아니냐, 이진분류
+    
+    def extract_features(self, x):
+        f1 = self.features[0](x)   # [B,  8, 256, 256]
+        f2 = self.features[1](f1)  # [B, 16, 128, 128]
+        f3 = self.features[2](f2)  # [B, 32,  64,  64]    

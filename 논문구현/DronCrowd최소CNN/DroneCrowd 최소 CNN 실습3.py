@@ -63,7 +63,7 @@ def make_toy_data(num_samples=80, img_size=32):
     )
 
     for _ in range(num_samples):
-        num_people = random.randint(1, 32)
+        num_people = random.randint(1, 10)
         dx, dy = random.randint(-2, 2), random.randint(-2, 2)
         points_prev = [
             (random.randint(6, img_size - 7), random.randint(6, img_size - 7))
@@ -301,7 +301,7 @@ if __name__ == "__main__":
         assert torch.isfinite(ploc).all() and ploc.min() >= 0 and ploc.max() <= 1
 
     # 4. epoch는 train() 함수 밖에서 관리함 (fit() 만들지 않음)
-    epoch = 30
+    epoch = 15
     train_loss_list = []
     val_loss_list = []
     val_mae_list = []
@@ -332,3 +332,10 @@ if __name__ == "__main__":
     print(f"첫 검증 sample, 이전 프레임: 정답 {true_counts[0,0].item():.0f}명, "
           f"예측 {pred_counts[0,0].item():.2f}명")
     print("완료: Siamese + U-Net 방식 Multi-scale Fusion + Density/Localization 실습")
+    
+    
+    """
+    초록 - 그림 인트로 - 메소드 - conculution
+이 논문과 다음 논문의 차이점은 무엇인지, 내가 더 발전시킬 수 있는 부분은 어디인지. . . . .. 
+5페이지의 슬라이드로 만들어 보기
+"""
